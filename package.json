@@ -1,0 +1,11 @@
+{
+  "name": "hoshino-chatbot",
+  "version": "1.0.0",
+  "description": "Cahtbot Hoshino yang siap nemenin kamu saat kesepian! >V<",
+  "main": "index.js",
+  "scripts": {
+    "test": "node index.js"
+  },
+  "author": "Arash",
+  "license": "ISC"
+}
