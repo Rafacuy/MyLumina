@@ -4,106 +4,113 @@ const zlib = require('zlib');
 
 const MEMORY_FILE = path.join(__dirname, 'memory.json');
 const BACKUP_DIR = path.join(__dirname, 'backups');
-const MAX_HISTORY_LENGTH = 100; // Maksimal 100 pesan terakhir
-const BACKUP_RETENTION = 3; // Jumlah backup yang disimpan
-const TARGET_USER_NAME = 'Arash'; // Nama pengguna yang spesifik
+const MAX_HISTORY_LENGTH = 100; // Maks cuma 100 pesan
+const BACKUP_RETENTION = 3; // Jumlah backup 
+const TARGET_USER_NAME = 'Arash'; // Nama p
 
-// Queue untuk menghindari race condition
 let saveQueue = Promise.resolve();
 
 const validateHistory = (history) => {
-  return Array.isArray(history) && history.every(msg =>
-    msg && typeof msg === 'object' &&
-    ['role', 'content', 'from'].every(prop => prop in msg) &&
-    typeof msg.from === 'object' &&
-    'first_name' in msg.from
-  );
+  try {
+    return Array.isArray(history) && 
+           history.length <= MAX_HISTORY_LENGTH &&
+           history.every(msg => msg?.content);
+  } catch {
+    return false;
+  }
 };
 
 const load = async () => {
   try {
+    const fileExists = await fs.access(MEMORY_FILE).then(() => true).catch(() => false);
+    
+    if (!fileExists) {
+      await save([]);
+      return [];
+    }
+
     const compressedData = await fs.readFile(MEMORY_FILE);
-    const data = zlib.gunzipSync(compressedData).toString('utf8');
+    const data = zlib.gunzipSync(compressedData).toString();
     const history = JSON.parse(data);
 
     if (!validateHistory(history)) {
-      console.error('Invalid history format, loading backup');
+      console.log('Invalid history, loading backup');
       return await loadBackup();
     }
 
     return history.slice(-MAX_HISTORY_LENGTH);
   } catch (error) {
-    if (error.code === 'ENOENT') {
-      console.log('Memory file not found, creating new one');
-      return [];
-    }
-    console.error('Error loading memory:', error);
+    console.error('Load error:', error);
     return await loadBackup();
   }
 };
 
 const loadBackup = async () => {
   try {
-    const backups = await fs.readdir(BACKUP_DIR);
-    const sortedBackups = backups
-      .filter(f => f.startsWith('memory_backup'))
+    const files = await fs.readdir(BACKUP_DIR);
+    const backups = files
+      .filter(f => f.endsWith('.json'))
       .sort()
-      .reverse();
+      .reverse()
+      .slice(0, BACKUP_RETENTION);
 
-    if (sortedBackups.length > 0) {
-      const data = await fs.readFile(path.join(BACKUP_DIR, sortedBackups[0]), 'utf8');
+    if (backups.length > 0) {
+      const data = await fs.readFile(path.join(BACKUP_DIR, backups[0]), 'utf8');
       return JSON.parse(data);
     }
   } catch (error) {
-    console.error('Error loading backup:', error);
+    console.error('Backup error:', error);
   }
   return [];
 };
 
 const rotateBackups = async () => {
   try {
-    await fs.mkdir(BACKUP_DIR, { recursive: true });
-    const backups = await fs.readdir(BACKUP_DIR);
-    const sortedBackups = backups
+    const files = await fs.readdir(BACKUP_DIR);
+    const backups = files
       .filter(f => f.startsWith('memory_backup'))
       .sort()
       .reverse();
 
-    // Hapus backup lama
-    for (const file of sortedBackups.slice(BACKUP_RETENTION)) { // Perbaikan slice
+    const toDelete = backups.slice(BACKUP_RETENTION);
+    
+    for (const file of toDelete) {
       await fs.unlink(path.join(BACKUP_DIR, file));
     }
   } catch (error) {
-    console.error('Error rotating backups:', error);
+    console.error('Rotate error:', error);
   }
 };
 
+
 const save = async (history) => {
   const trimmedHistory = history.slice(-MAX_HISTORY_LENGTH);
-
-  // Tambahkan ke queue untuk menghindari race condition
-  saveQueue = saveQueue.then(async () => {
+  
+  return saveQueue = saveQueue.then(async () => {
     try {
-      // Buat backup sebelum menyimpan
+      // Buat backup folder
+      await fs.mkdir(BACKUP_DIR, { recursive: true });
+
+      // Simpan backup
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
       const backupFile = path.join(BACKUP_DIR, `memory_backup_${timestamp}.json`);
-
-      await fs.mkdir(BACKUP_DIR, { recursive: true });
       await fs.writeFile(backupFile, JSON.stringify(trimmedHistory));
-      await rotateBackups();
 
-      // Kompresi data untuk penyimpanan
+      // Kompresi data
       const compressed = zlib.gzipSync(JSON.stringify(trimmedHistory));
+      
+      // Tulis ke file utama
       await fs.writeFile(MEMORY_FILE, compressed);
+      
+      // Rotate backup
+      await rotateBackups();
 
       return true;
     } catch (error) {
-      console.error('Error saving memory:', error);
+      console.error('Save error:', error);
       return false;
     }
   });
-
-  return saveQueue;
 };
 
 const addMessage = async (message) => {
@@ -121,10 +128,16 @@ const getLastChatBy = async (userName) => {
 };
 
 const saveLastChat = async (message) => {
-  if (message && message.from && message.from.first_name === TARGET_USER_NAME) {
-    const history = await load();
-    const newHistory = [...history.filter(msg => !(msg.from && msg.from.first_name === TARGET_USER_NAME)), message]; // Hapus chat Arash sebelumnya
-    await save(newHistory);
+  try {
+    if (message?.from?.first_name === TARGET_USER_NAME) {
+      const history = await load();
+      const filtered = history.filter(msg => 
+        msg.from?.id !== message.from.id
+      );
+      await save([...filtered, message]);
+    }
+  } catch (error) {
+    console.error('Save last chat error:', error);
   }
 };
 

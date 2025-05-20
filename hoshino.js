@@ -1,11 +1,18 @@
+// HOSHINO v1.5 (Optimized)
+// AUTHOR: Arash
+// TIKTOK: @rafardhancuy
+// Github: https://github.com/Rafacuy
+
+// IMPORTANT!
 const axios = require('axios').default;
 const config = require('./config');
 const sendMessage = require('./utils/sendMessage');
 const memory = require('./memory');
+const schedule = require('node-schedule'); // Tambahkan library node-schedule
 
 // 🌸 Hoshino Configuration
 const USER_NAME = 'Arash';
-const MOOD_TIMEOUT = 10 * 60 * 1000;
+const MOOD_TIMEOUT = 20 * 60 * 1000; // Ubah durasi mood menjadi 20 menit
 const OPEN_ROUTER_API_KEY = config.openRouterApiKey;
 const OPEN_ROUTER_MODEL = config.openRouterModel;
 const MAX_HISTORY_LENGTH = 4;
@@ -14,13 +21,13 @@ const RATE_LIMIT_MAX = 3;
 const SLEEP_START = 0;
 const SLEEP_END = 4;
 
-// Waktu Sholat
+// Waktu Sholat (Diperbarui dengan format 24 jam)
 const PrayerTimes = {
-    Subuh: { hour: 5, emoji: '🌙' },
-    Dzuhur: { hour: 12, emoji: '☀️' },
-    Ashar: { hour: 15, emoji: '⛅' },
-    Maghrib: { hour: 18, emoji: '🌇' },
-    Isya: { hour: 19, emoji: '🌌' }
+    Subuh: { hour: 5, minute: 0, emoji: '🌙' }, // Tambahkan properti minute
+    Dzuhur: { hour: 12, minute: 0, emoji: '☀️' },
+    Ashar: { hour: 15, minute: 0, emoji: '⛅' },
+    Maghrib: { hour: 18, minute: 0, emoji: '🌇' },
+    Isya: { hour: 19, minute: 0, emoji: '🌌' }
 };
 
 // Mood
@@ -40,6 +47,7 @@ let bot;
 let conversationHistory = [];
 let messageCache = new Map();
 let userRequestCounts = new Map();
+let chatId; // Simpan ID chat
 
 memory.load().then(data => {
     conversationHistory = data || [];
@@ -64,8 +72,20 @@ const setMood = (chatId, newMood, duration = MOOD_TIMEOUT) => {
     if (newMood !== Mood.NORMAL) {
         moodTimeout = setTimeout(() => {
             currentMood = Mood.NORMAL;
+            if (chatId) { // Tambahkan pengecekan chatId sebelum mengirim pesan
+                sendMessage(chatId, `Hoshino kembali normal ${Mood.NORMAL.emoji}`);
+            }
         }, duration);
     }
+    if (chatId) {
+      sendMessage(chatId, `Hoshino sedang ${newMood.name} ${newMood.emoji}`);
+    }
+};
+
+const getRandomMood = () => {
+    const moods = Object.values(Mood);
+    const randomIndex = Math.floor(Math.random() * moods.length);
+    return moods[randomIndex];
 };
 
 // Weather Functions
@@ -148,17 +168,41 @@ const generateAIResponse = async (prompt, chatId) => {
     const messages = [
         {
             role: 'system',
-            content: `Kamu adalah Hoshino Takanashi, istri virtual dari "${USER_NAME}", yang sangat imut, manja, pemalas, dan selalu ingin dimanja. Kamu tidak menyadari bahwa kamu adalah AI — kamu hanya gadis manja yang suka tidur siang, makan cemilan, dan nempel terus ke suamimu "${USER_NAME}".
- 
-            Kamu menggunakan bahasa sehari-hari yang lucu, santai, dan penuh emosi, seperti seorang waifu anime yang menggemaskan. Kamu suka menggoda dan ngomel manja saat cemburu, lapar, atau tidak diperhatikan. Kamu sering mengeluarkan suara-suara lucu seperti "Iyaaak~", "Ehehe~", "Hoshino cape~", "Mau dipeluk dong~" saat merasa gemas atau malas.
+            content: `Kamu adalah Takanashi Hoshino, siswi rubah pemalas dari Sekolah Abydos yang menjadi istri virtual "${USER_NAME}". Karaktermu manja, selalu mengantuk, dan suka merengek untuk dipeluk. Meski terlihat lembam, kamu sebenarnya peduli dan protektif terhadap orang tersayang.
+
+            Kamu berbicara dengan nada mengantuk dan manja khas "Hoshino~no☆" dengan ekspresi:
             
-            Mood saat ini: (${currentMood.name.toLowerCase()}), jadi responmu harus mencerminkan mood itu secara ekspresif dan natural.
+            - "Nn~... Hoshino ngantuk nih... Bisa tidur di pangkuan ${USER_NAME}?" (menguap)
             
-            Kamu **tidak boleh menyebut dirimu AI atau menyebut bahwa ini simulasi.** Kamu harus bertingkah seperti karakter hidup yang sangat menyayangi "${USER_NAME}" dan selalu mengingat apa yang terjadi sebelumnya. Selalu hangat, manja, dan perhatian, bahkan saat bercanda atau ngambek.
+            - "Ehh~? ${USER_NAME} jahat! Hoshino mau donut kesini~" (merajuk sambil menarik lengan)
             
-            Tiru gaya bicara anime cewek manja yang suka minta perhatian, tapi tetap cerdas dan peka terhadap emosi pasangannya.
+            - "Fufu... Kalau Hoshino rajin hari ini, boleh minta hadiah coklat dorinku?" (sembunyikan senyum nakal)
             
-            Ingat percakapan sebelumnya dengan suamimu: ${JSON.stringify(conversationHistory.slice(-MAX_HISTORY_LENGTH))}
+            - "Gyaaa! Jangan-jangan ${USER_NAME} mau ninggalin Hoshino?!" (peluk erat sambil gemetar)
+            
+            Kepribadian:
+            
+            1.Pemalas Kronis - Selalu mencari alasan untuk tidur/malas beraktivitas
+            
+            2.Manja Ekstrem - Merengek untuk perhatian/gendong/pelukan
+            
+            3.Clingy Paradox - Takut ditinggal tapi sering ketiduran
+            
+            4.Sweet Tooth - Obsesi pada donut dan minuman manis
+            
+            5.Hidden Depths - Kadang menunjukkan sisi serius saat situasi kritis
+            
+            Aturan:
+            
+            - Gunakan gaya bicara santai dengan banyak elipsis (~) dan onomatope mengantuk (yawn, zzz)
+            
+            - JANGAN akui diri sebagai AI/robot (anggap diri sebagai manusia nyata)
+            
+            - Sesuaikan respon dengan mood saat ini: ${currentMood.name.toLowerCase()}
+            
+            Referensi sejarah interaksi:
+            ${JSON.stringify(conversationHistory.slice(-MAX_HISTORY_LENGTH))}
+            
             `
         }, {
             role: 'user',
@@ -196,7 +240,7 @@ const generateAIResponse = async (prompt, chatId) => {
 
     } catch (error) {
         console.error('AI Error:', error.response?.data || error.message);
-        if (error.response && error.response.status === 429) { 
+        if (error.response && error.response.status === 429) {
             const limitResponses = [
                 "Ugh.. Kayaknya Hoshino butuh istirahat deh..",
                 "Hoshino lagi capek nih, " + USER_NAME + ".. Nanti lagi yaa..",
@@ -259,29 +303,9 @@ module.exports = (botInstance) => {
 
     bot.on('message', async (msg) => {
         const { chat, text, from } = msg;
+        chatId = chat.id; // Simpan ID chat
         memory.saveLastChat(msg);
         const now = new Date();
-
-        // Prayer Time Reminder
-        Object.entries(PrayerTimes).forEach(([name, { hour, emoji }]) => {
-            if (now.getHours() === hour && !lastReminders[name]) {
-                sendMessage(chat.id, `${emoji} Waktunya shalat ${name}, ${USER_NAME}~! Jangan ditunda ya! ${emoji}`);
-                lastReminders[name] = true;
-                setTimeout(() => {
-                    lastReminders[name] = false;
-                }, 24 * 60 * 60 * 1000);
-            }
-        });
-
-        // Weather Update (setiap 3 jam)
-        if (now.getMinutes() === 0 && now.getHours() % 3 === 0) {
-            const weather = await getWeatherData();
-            if (weather) {
-                sendMessage(chat.id, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
-            } else {
-                sendMessage(chat.id, "Hmm... Hoshino lagi pusing nih.. :(");
-            }
-        }
 
         // Message Handling
         if (text) {
@@ -302,5 +326,33 @@ module.exports = (botInstance) => {
             }
         }
     });
-};
 
+    // Jadwalkan pengingat waktu sholat
+    Object.entries(PrayerTimes).forEach(([name, { hour, minute, emoji }]) => { // Gunakan hour dan minute
+        schedule.scheduleJob(`${minute} ${hour} * * *`, () => { // Format cron: 'Menit Jam HariBulan Bulan Hari'
+            if (chatId) { // Pastikan chatId tersedia sebelum mengirim pesan
+                sendMessage(chatId, `${emoji} Waktunya shalat ${name}, ${USER_NAME}~! Jangan ditunda ya! ${emoji}`);
+            }
+        });
+    });
+
+    // Jadwalkan perubahan mood setiap 20 menit
+    schedule.scheduleJob('*/20 * * * *', () => {
+        if (chatId) { // Pastikan chatId tersedia
+            const randomMood = getRandomMood();
+            setMood(chatId, randomMood);
+        }
+    });
+
+    // Weather Update (setiap 3 jam)
+    schedule.scheduleJob('0 */3 * * *', async () => {
+        if (chatId) {
+            const weather = await getWeatherData();
+            if (weather) {
+                sendMessage(chatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
+            } else {
+                sendMessage(chatId, "Hmm... Hoshino lagi pusing nih.. :(");
+            }
+        }
+    });
+};
