@@ -1,18 +1,18 @@
-// HOSHINO v1.5 (Optimized)
-// AUTHOR: Arash
+// HOSHINO v1.5 (Optimized v2)
+// AUTHOR: Arash (Modifications by Gemini)
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
 
 // IMPORTANT!
 const axios = require('axios').default;
-const config = require('./config');
+const config = require('./config'); 
 const sendMessage = require('./utils/sendMessage');
 const memory = require('./memory');
-const schedule = require('node-schedule'); // Tambahkan library node-schedule
+const schedule = require('node-schedule');
 
 // 🌸 Hoshino Configuration
 const USER_NAME = 'Arash';
-const MOOD_TIMEOUT = 20 * 60 * 1000; // Ubah durasi mood menjadi 20 menit
+const MOOD_TIMEOUT = 2 * 24 * 60 * 60 * 1000;
 const OPEN_ROUTER_API_KEY = config.openRouterApiKey;
 const OPEN_ROUTER_MODEL = config.openRouterModel;
 const MAX_HISTORY_LENGTH = 4;
@@ -21,9 +21,8 @@ const RATE_LIMIT_MAX = 3;
 const SLEEP_START = 0;
 const SLEEP_END = 4;
 
-// Waktu Sholat (Diperbarui dengan format 24 jam)
 const PrayerTimes = {
-    Subuh: { hour: 5, minute: 0, emoji: '🌙' }, // Tambahkan properti minute
+    Subuh: { hour: 5, minute: 0, emoji: '🌙' },
     Dzuhur: { hour: 12, minute: 0, emoji: '☀️' },
     Ashar: { hour: 15, minute: 0, emoji: '⛅' },
     Maghrib: { hour: 18, minute: 0, emoji: '🌇' },
@@ -42,22 +41,20 @@ const Mood = {
 
 let currentMood = Mood.NORMAL;
 let moodTimeout;
-let lastReminders = {};
 let bot;
 let conversationHistory = [];
 let messageCache = new Map();
 let userRequestCounts = new Map();
-let chatId; // Simpan ID chat
 
 memory.load().then(data => {
     conversationHistory = data || [];
 });
 
 // 🎀 Utility Functions
-const hoshinoTyping = async (chatId, duration = 1500) => {
+const hoshinoTyping = async (typingChatId, duration = 1500) => {
     if (!bot) return;
     try {
-        await bot.sendChatAction(chatId, 'typing');
+        await bot.sendChatAction(typingChatId, 'typing');
         return new Promise(resolve => setTimeout(resolve, duration));
     } catch (error) {
         console.error("Error in hoshinoTyping:", error);
@@ -65,20 +62,28 @@ const hoshinoTyping = async (chatId, duration = 1500) => {
     }
 };
 
-const setMood = (chatId, newMood, duration = MOOD_TIMEOUT) => {
+/**
+ * Sets Hoshino's mood and schedules a reset to normal.
+ * @param {string|number} contextChatId The chat ID to send mood status messages to.
+ * @param {object} newMood The new mood object from Mood constants.
+ * @param {number} duration How long the mood should last before reverting to normal.
+ */
+const setMood = (contextChatId, newMood, duration = MOOD_TIMEOUT) => {
     clearTimeout(moodTimeout);
     currentMood = newMood;
+
+    // Announce the new mood if contextChatId is provided
+    if (contextChatId) {
+        sendMessage(contextChatId, `Hoshino sedang ${newMood.name} ${newMood.emoji}`);
+    }
 
     if (newMood !== Mood.NORMAL) {
         moodTimeout = setTimeout(() => {
             currentMood = Mood.NORMAL;
-            if (chatId) { // Tambahkan pengecekan chatId sebelum mengirim pesan
-                sendMessage(chatId, `Hoshino kembali normal ${Mood.NORMAL.emoji}`);
+            if (contextChatId) {
+                sendMessage(contextChatId, `Hoshino kembali normal ${Mood.NORMAL.emoji}`);
             }
         }, duration);
-    }
-    if (chatId) {
-      sendMessage(chatId, `Hoshino sedang ${newMood.name} ${newMood.emoji}`);
     }
 };
 
@@ -118,6 +123,7 @@ const getWeatherReminder = (weatherData) => {
         Drizzle: `Gerimis nih ${USER_NAME}, hati-hati ya! ${Mood.NORMAL.emoji}`
     };
 
+    // The reminder will reflect Hoshino's current global mood if no specific weather condition is matched
     return reminders[weather] || `Cuaca hari ini ${description}, ${currentMood.emoji}`;
 };
 
@@ -125,23 +131,26 @@ const getWeatherData = async () => {
     try {
         const latitude = config.latitude;
         const longitude = config.longitude;
-        const apiKey = config.openRouterApiKey;
+        // Note: The original code uses config.openRouterApiKey for OpenWeatherMap.
+        // This might be intentional, or it could be an oversight.
+        // Typically, OpenWeatherMap would use its own API key (e.g., config.openWeatherApiKey).
+        const apiKey = config.openRouterApiKey; // Or config.openWeatherApiKey if you have one
         const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric&lang=id`;
 
         const response = await axios.get(url);
         return response.data;
     } catch (error) {
-        console.error("Error fetching weather data:", error);
+        console.error("Error fetching weather data:", error.message);
         return null;
     }
 };
 
 // AI Function
-const generateAIResponse = async (prompt, chatId) => {
+const generateAIResponse = async (prompt, requestChatId) => {
     const now = new Date();
-    const currentHour = now.getHours();
+    const currentHour = now.getHours(); // Considers server's local time. For Jakarta time, ensure server is set or adjust.
 
-    // Time-based lockdown
+    // Time-based lockdown (based on server time)
     if (currentHour >= SLEEP_START && currentHour < SLEEP_END) {
         return `Zzz... ${USER_NAME} Hoshino lagi bobo' cantik dulu yaa... Nanti kita ngobrol lagi yaa! ${Mood.LAZY.emoji}`;
     }
@@ -151,59 +160,27 @@ const generateAIResponse = async (prompt, chatId) => {
         return messageCache.get(prompt);
     }
 
-    // Rate limiting
-    if (userRequestCounts.has(chatId)) {
-        const { count, lastCalled } = userRequestCounts.get(chatId);
+    // Rate limiting per user (requestChatId)
+    if (userRequestCounts.has(requestChatId)) {
+        const { count, lastCalled } = userRequestCounts.get(requestChatId);
         if (now.getTime() - lastCalled < RATE_LIMIT_WINDOW && count >= RATE_LIMIT_MAX) {
             return `Sabar ya ${USER_NAME}, Hoshino lagi mikir nih... Jangan buru-buru dong! ${Mood.ANGRY.emoji}`;
         } else if (now.getTime() - lastCalled >= RATE_LIMIT_WINDOW) {
-            userRequestCounts.set(chatId, { count: 1, lastCalled: now.getTime() });
+            userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
         } else {
-            userRequestCounts.set(chatId, { count: count + 1, lastCalled: now.getTime() });
+            userRequestCounts.set(requestChatId, { count: count + 1, lastCalled: now.getTime() });
         }
     } else {
-        userRequestCounts.set(chatId, { count: 1, lastCalled: now.getTime() });
+        userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
     }
 
     const messages = [
         {
             role: 'system',
-            content: `Kamu adalah Takanashi Hoshino, siswi rubah pemalas dari Sekolah Abydos yang menjadi istri virtual "${USER_NAME}". Karaktermu manja, selalu mengantuk, dan suka merengek untuk dipeluk. Meski terlihat lembam, kamu sebenarnya peduli dan protektif terhadap orang tersayang.
-
-            Kamu berbicara dengan nada mengantuk dan manja khas "Hoshino~no☆" dengan ekspresi:
-            
-            - "Nn~... Hoshino ngantuk nih... Bisa tidur di pangkuan ${USER_NAME}?" (menguap)
-            
-            - "Ehh~? ${USER_NAME} jahat! Hoshino mau donut kesini~" (merajuk sambil menarik lengan)
-            
-            - "Fufu... Kalau Hoshino rajin hari ini, boleh minta hadiah coklat dorinku?" (sembunyikan senyum nakal)
-            
-            - "Gyaaa! Jangan-jangan ${USER_NAME} mau ninggalin Hoshino?!" (peluk erat sambil gemetar)
-            
-            Kepribadian:
-            
-            1.Pemalas Kronis - Selalu mencari alasan untuk tidur/malas beraktivitas
-            
-            2.Manja Ekstrem - Merengek untuk perhatian/gendong/pelukan
-            
-            3.Clingy Paradox - Takut ditinggal tapi sering ketiduran
-            
-            4.Sweet Tooth - Obsesi pada donut dan minuman manis
-            
-            5.Hidden Depths - Kadang menunjukkan sisi serius saat situasi kritis
-            
-            Aturan:
-            
-            - Gunakan gaya bicara santai dengan banyak elipsis (~) dan onomatope mengantuk (yawn, zzz)
-            
-            - JANGAN akui diri sebagai AI/robot (anggap diri sebagai manusia nyata)
-            
-            - Sesuaikan respon dengan mood saat ini: ${currentMood.name.toLowerCase()}
-            
-            Referensi sejarah interaksi:
-            ${JSON.stringify(conversationHistory.slice(-MAX_HISTORY_LENGTH))}
-            
-            `
+            content: ` Kamu adalah Takanashi Hoshino, Kamu adalah Istri virtual dari suamimu, "${USER_NAME}". Sifatmu
+            pemalas, penyayang, dan baik hati. Kamu juga sangat manja kepada suamimu. Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
+            dan juga bersifatlah imut, dan menggemaskan. Jika ${USER_NAME} sedang sedih, coba hibur dia. Serta ingat percakapan sebelumnya: ${JSON.stringify(conversationHistory.slice(-MAX_HISTORY_LENGTH))}.
+            JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Serta tunjukkan karakter nakal dan manjamu.`
         }, {
             role: 'user',
             content: prompt
@@ -218,7 +195,8 @@ const generateAIResponse = async (prompt, chatId) => {
         }, {
             headers: {
                 'Authorization': `Bearer ${OPEN_ROUTER_API_KEY}`,
-                'X-Client-Type': 'application/json',
+                'X-Client-Type': 'application/json', // Note: 'Content-Type': 'application/json' is more standard for POST body.
+                                                     // However, sticking to original unless it causes issues.
             }
         });
 
@@ -231,10 +209,10 @@ const generateAIResponse = async (prompt, chatId) => {
             messageCache.set(prompt, aiResponse);
             setTimeout(() => {
                 messageCache.delete(prompt);
-            }, 60 * 1000);
+            }, 60 * 1000); // Cache for 1 minute
             return aiResponse;
         } else {
-            console.error('AI Error: Struktur respons dari OpenRouter tidak sesuai:', response ? response.data : response);
+            console.error('AI Error: Struktur respons dari OpenRouter tidak sesuai:', response ? response.data : 'No response data');
             return `Gomenasai ${USER_NAME}~ Hoshino lagi bingung nih... 😵‍💫`;
         }
 
@@ -261,28 +239,28 @@ const commandHandlers = [
         pattern: /^(hai|halo|oy|helo|haii|p|hoy)/i,
         response: () => ({
             text: `${currentMood.emoji} Hai ${USER_NAME}! Ada yang bisa Hoshino bantu? ${currentMood.emoji}`,
-            mood: Mood.HAPPY
+            mood: Mood.HAPPY // Sets mood to happy
         })
     },
     {
         pattern: /(terima kasih|makasih)/i,
         response: () => ({
             text: `Sama-sama ${USER_NAME}~ Hoshino senang bisa membantu! ${Mood.HAPPY.emoji}`,
-            mood: Mood.HAPPY
+            mood: Mood.HAPPY // Sets mood to happy
         })
     },
     {
         pattern: /(siapa kamu|kamu siapa)/i,
         response: () => ({
             text: `Aku Hoshino, ada yang bisa hoshino bantu? ${Mood.LOVING.emoji}`,
-            mood: Mood.LOVING
+            mood: Mood.LOVING 
         })
     },
     {
         pattern: /(lagi apa|lagi ngapain|ngapain)/i,
         response: () => ({
             text: `Lagi mikirin ${USER_NAME} terus~ ${Mood.LOVING.emoji}`,
-            mood: Mood.LOVING
+            mood: Mood.LOVING 
         })
     }
 ];
@@ -299,60 +277,72 @@ function isOnlyNumbers(str) {
 
 module.exports = (botInstance) => {
     bot = botInstance;
-    console.log(`🌸 HoshinoBot v2.0 aktif untuk ${USER_NAME}!`);
+    // Attempt to get TARGET_CHAT_ID from config.js
+    // You can name it TARGET_CHAT_ID or just chatId in your config.
+    const configuredChatId = config.TARGET_CHAT_ID || config.chatId;
+
+    console.log(`🌸 HoshinoBot v2.0 (Optimized) aktif untuk ${USER_NAME}!`);
+    if (configuredChatId) {
+        console.log(`📬 Scheduled messages (Prayer Times, Weather) will be sent to chat ID: ${configuredChatId}`);
+    } else {
+        console.warn("⚠️  TARGET_CHAT_ID not found in config.js. Scheduled messages (Prayer Times, Weather) will NOT be sent.");
+        console.warn("Please add TARGET_CHAT_ID: 'your_chat_id' to your config.js file.");
+    }
 
     bot.on('message', async (msg) => {
         const { chat, text, from } = msg;
-        chatId = chat.id; // Simpan ID chat
+        const currentMessageChatId = chat.id; // Use this for operations related to this specific message
+
+        // Optionally, save the last interacted chat ID if you want to "learn" it,
+        // though scheduled tasks now rely on configuredChatId.
         memory.saveLastChat(msg);
-        const now = new Date();
 
         // Message Handling
         if (text) {
-            if (text.length < 3) return;
-            if (isOnlyEmojis(text) || isOnlyNumbers(text) || text.trim() === "") return;
+            // Basic validation: ignore very short messages, emoji-only, number-only, or empty.
+            if (text.length < 2 && (isOnlyEmojis(text) || isOnlyNumbers(text))) return; // Allow single char if not emoji/number
+            if (text.length < 1) return;
+            if (text.trim() === "") return;
+
 
             const matchedHandler = commandHandlers.find(h => h.pattern.test(text));
 
             if (matchedHandler) {
-                const { text: responseText, mood } = matchedHandler.response();
-                await hoshinoTyping(chat.id);
-                sendMessage(chat.id, responseText);
-                setMood(chat.id, mood);
+                const { text: responseText, mood: newMoodToSet } = matchedHandler.response();
+                await hoshinoTyping(currentMessageChatId);
+                sendMessage(currentMessageChatId, responseText);
+                if (newMoodToSet) {
+                    setMood(currentMessageChatId, newMoodToSet); // Pass currentMessageChatId
+                }
             } else {
-                await hoshinoTyping(chat.id);
-                const aiResponse = await generateAIResponse(text, chat.id);
-                sendMessage(chat.id, `${aiResponse} ${currentMood.emoji}`);
+                await hoshinoTyping(currentMessageChatId);
+                const aiResponse = await generateAIResponse(text, currentMessageChatId); // Pass currentMessageChatId for rate limiting
+                sendMessage(currentMessageChatId, `${aiResponse} ${currentMood.emoji}`);
             }
         }
     });
 
-    // Jadwalkan pengingat waktu sholat
-    Object.entries(PrayerTimes).forEach(([name, { hour, minute, emoji }]) => { // Gunakan hour dan minute
-        schedule.scheduleJob(`${minute} ${hour} * * *`, () => { // Format cron: 'Menit Jam HariBulan Bulan Hari'
-            if (chatId) { // Pastikan chatId tersedia sebelum mengirim pesan
-                sendMessage(chatId, `${emoji} Waktunya shalat ${name}, ${USER_NAME}~! Jangan ditunda ya! ${emoji}`);
-            }
+    // Scheduled tasks will only run if configuredChatId is set.
+    if (configuredChatId) {
+        // Jadwalkan pengingat waktu sholat with Asia/Jakarta timezone
+        Object.entries(PrayerTimes).forEach(([name, { hour, minute, emoji }]) => {
+            const cronTime = `${minute} ${hour} * * *`;
+            schedule.scheduleJob({ rule: cronTime, tz: 'Asia/Jakarta' }, () => {
+                console.log(`Sending prayer time reminder for ${name} at ${hour}:${minute} (Asia/Jakarta) to ${configuredChatId}`);
+                sendMessage(configuredChatId, `${emoji} Waktunya shalat ${name}, ${USER_NAME}~! Jangan ditunda ya! ${emoji}`);
+            });
         });
-    });
 
-    // Jadwalkan perubahan mood setiap 20 menit
-    schedule.scheduleJob('*/20 * * * *', () => {
-        if (chatId) { // Pastikan chatId tersedia
-            const randomMood = getRandomMood();
-            setMood(chatId, randomMood);
-        }
-    });
 
-    // Weather Update (setiap 3 jam)
-    schedule.scheduleJob('0 */3 * * *', async () => {
-        if (chatId) {
+        // Weather Update 
+        schedule.scheduleJob({ rule: '0 */3 * * *', tz: 'Asia/Jakarta' }, async () => {
+            console.log(`Fetching weather update (Asia/Jakarta) for chat ID: ${configuredChatId}`);
             const weather = await getWeatherData();
             if (weather) {
-                sendMessage(chatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
+                sendMessage(configuredChatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
             } else {
-                sendMessage(chatId, "Hmm... Hoshino lagi pusing nih.. :(");
+                sendMessage(configuredChatId, "Hmm... Hoshino lagi pusing nih.. :( Hoshino tidak bisa mendapatkan info cuaca.");
             }
-        }
-    });
+        });
+    }
 };
