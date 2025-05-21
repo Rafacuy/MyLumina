@@ -1,26 +1,30 @@
-// HOSHINO v1.5 (Optimized v2)
-// AUTHOR: Arash (Modifications by Gemini)
+// HOSHINO v2.0 (Optimized) 
+// AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
+// LANGUAGE: ID (Indonesia)
+// TIME FORMAT: Asia/jakarta
+// MIT License 
 
 // IMPORTANT!
 const axios = require('axios').default;
-const config = require('./config'); 
-const sendMessage = require('./utils/sendMessage');
-const memory = require('./memory');
-const schedule = require('node-schedule');
+const config = require('./config'); // Configuration File (API, ChatID, etc)
+const sendMessage = require('./utils/sendMessage'); // Utility functions (for sending message)
+const memory = require('./memory'); // memory files, handling memory functions (including save, load, etc) 
+const schedule = require('node-schedule'); //  scheduling tasks like prayer times and weather updates
 
-// 🌸 Hoshino Configuration
-const USER_NAME = 'Arash';
-const MOOD_TIMEOUT = 2 * 24 * 60 * 60 * 1000;
-const OPEN_ROUTER_API_KEY = config.openRouterApiKey;
-const OPEN_ROUTER_MODEL = config.openRouterModel;
-const MAX_HISTORY_LENGTH = 4;
-const RATE_LIMIT_WINDOW = 20 * 1000;
-const RATE_LIMIT_MAX = 3;
-const SLEEP_START = 0;
-const SLEEP_END = 4;
+// 🌸 Hoshino Configuration Constants
+const USER_NAME = 'Arash'; // The name of the user Hoshino interacts with (you can modified it)
+const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days in milliseconds
+const OPEN_ROUTER_API_KEY = config.openRouterApiKey; // API key for OpenRouter AI
+const OPEN_ROUTER_MODEL = config.openRouterModel; // AI model (I use meta: Llama 3.5 8B instruct)
+const RATE_LIMIT_WINDOW_MS = 20 * 1000; // Rate limit window: 20 seconds
+const RATE_LIMIT_MAX_REQUESTS = 3; // Max requests allowed within the rate limit window per user
+const SLEEP_START_HOUR = 0; // Hoshino's sleep start time (00:00 - midnight)
+const SLEEP_END_HOUR = 4;   // Hoshino's sleep end time (04:00 - 4 AM)
+const CONVERSATION_HISTORY_LIMIT = 10; // Limits the number of recent messages sent to AI 
 
+// Prayer Times (Configured for Asia/Jakarta timezone)
 const PrayerTimes = {
     Subuh: { hour: 5, minute: 0, emoji: '🌙' },
     Dzuhur: { hour: 12, minute: 0, emoji: '☀️' },
@@ -29,64 +33,85 @@ const PrayerTimes = {
     Isya: { hour: 19, minute: 0, emoji: '🌌' }
 };
 
-// Mood
+// Mood Definitions 
 const Mood = {
     HAPPY: { emoji: '>.<', name: 'Happy' },
     SAD: { emoji: '😢', name: 'Sad' },
     ANGRY: { emoji: '😠', name: 'Angry' },
     LAZY: { emoji: '😪', name: 'Lazy' },
     LOVING: { emoji: '💖', name: 'Loving' },
-    NORMAL: { emoji: '🌸', name: 'Normal' }
+    NORMAL: { emoji: '�', name: 'Normal' }
 };
 
-let currentMood = Mood.NORMAL;
-let moodTimeout;
-let bot;
-let conversationHistory = [];
-let messageCache = new Map();
-let userRequestCounts = new Map();
+// Global State Variables
+let currentMood = Mood.NORMAL; // Hoshino's current mood
+let moodTimeoutId; // Stores the ID of the mood reset timeout
+let botInstance; // The Telegram Bot API instance
+let conversationHistory = []; // Stores the full conversation history for persistence
+let messageCache = new Map(); // Caches AI responses to avoid redundant API calls for identical prompts
+let userRequestCounts = new Map(); // Tracks request counts for rate limiting per user
 
+// Load conversation history 
 memory.load().then(data => {
     conversationHistory = data || [];
+    console.log(`Loaded ${conversationHistory.length} messages from memory.`);
+}).catch(error => {
+    console.error("Error loading conversation history from memory:", error);
 });
 
-// 🎀 Utility Functions
-const hoshinoTyping = async (typingChatId, duration = 1500) => {
-    if (!bot) return;
+/**
+ * Simulates bot typing action in a given chat for a specified duration.
+ * @param {string|number} chatId The chat ID where the typing action should be displayed.
+ * @param {number} duration The duration in milliseconds for which the typing action is shown.
+ */
+const hoshinoTyping = async (chatId, duration = 1500) => {
+    if (!botInstance) {
+        console.warn("Bot instance not initialized for typing action. Cannot send typing indicator.");
+        return;
+    }
     try {
-        await bot.sendChatAction(typingChatId, 'typing');
+        await botInstance.sendChatAction(chatId, 'typing');
+        // Return a promise that resolves after the duration, allowing for `await`
         return new Promise(resolve => setTimeout(resolve, duration));
     } catch (error) {
-        console.error("Error in hoshinoTyping:", error);
-        return;
+        console.error(`Error in hoshinoTyping for chat ID ${chatId}:`, error.message);
+        // Do not rethrow the error; allow the main message processing flow to continue.
     }
 };
 
 /**
- * Sets Hoshino's mood and schedules a reset to normal.
- * @param {string|number} contextChatId The chat ID to send mood status messages to.
- * @param {object} newMood The new mood object from Mood constants.
- * @param {number} duration How long the mood should last before reverting to normal.
+ * Sets Hoshino's mood and schedules a reset back to 'NORMAL' after a specified duration.
+ * If the new mood is already the current mood, no action is taken to avoid redundant messages.
+ * @param {string|number} chatId The chat ID to send mood status messages to.
+ * @param {object} newMood The new mood object (from Mood constants) to set.
+ * @param {number} durationMs The duration in milliseconds for which the new mood should last.
  */
-const setMood = (contextChatId, newMood, duration = MOOD_TIMEOUT) => {
-    clearTimeout(moodTimeout);
-    currentMood = newMood;
+const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
+    clearTimeout(moodTimeoutId); // Clear any previously scheduled mood reset
 
-    // Announce the new mood if contextChatId is provided
-    if (contextChatId) {
-        sendMessage(contextChatId, `Hoshino sedang ${newMood.name} ${newMood.emoji}`);
+    // Only update and announce the mood if it's actually changing
+    if (currentMood !== newMood) {
+        currentMood = newMood;
+        if (chatId) {
+            sendMessage(chatId, `Hoshino sedang ${newMood.name} ${newMood.emoji}`);
+        }
     }
 
+    // Schedule the mood reset only if the new mood is not 'NORMAL'
     if (newMood !== Mood.NORMAL) {
-        moodTimeout = setTimeout(() => {
+        moodTimeoutId = setTimeout(() => {
             currentMood = Mood.NORMAL;
-            if (contextChatId) {
-                sendMessage(contextChatId, `Hoshino kembali normal ${Mood.NORMAL.emoji}`);
+            if (chatId) {
+                sendMessage(chatId, `Hoshino kembali normal ${Mood.NORMAL.emoji}`);
             }
-        }, duration);
+        }, durationMs);
     }
 };
 
+/**
+ * Gets a random mood from the predefined Mood constants.
+ * @returns {object} A randomly selected mood object.
+ */
 const getRandomMood = () => {
     const moods = Object.values(Mood);
     const randomIndex = Math.floor(Math.random() * moods.length);
@@ -94,8 +119,14 @@ const getRandomMood = () => {
 };
 
 // Weather Functions
+/**
+ * Formats raw weather data into a user-friendly string.
+ * @param {object} weatherData The weather data object obtained from OpenWeatherMap API.
+ * @returns {string} A formatted string describing the current weather conditions.
+ */
 const getWeatherString = (weatherData) => {
-    if (!weatherData || !weatherData.main || !weatherData.weather) {
+    // Validate essential weather data properties
+    if (!weatherData?.main || !weatherData?.weather?.length) {
         return "Maaf, Hoshino tidak bisa mendapatkan informasi cuaca saat ini.";
     }
     const { temp, feels_like, humidity } = weatherData.main;
@@ -106,118 +137,166 @@ const getWeatherString = (weatherData) => {
         `Kondisi: ${description.charAt(0).toUpperCase() + description.slice(1)}`;
 };
 
+/**
+ * Provides a personalized weather-based reminder 
+ * The reminder adapts based on the main weather condition.
+ * @param {object} weatherData The weather data object from OpenWeatherMap API.
+ * @returns {string} A personalized reminder message related to the weather.
+ */
 const getWeatherReminder = (weatherData) => {
-    if (!weatherData || !weatherData.main || !weatherData.weather) {
-        return "Maaf," + USER_NAME + ".. Hoshino lagi pusing nih.. :p";
+    // Validate essential weather data properties
+    if (!weatherData?.main || !weatherData?.weather?.length) {
+        return `Maaf, ${USER_NAME}... Hoshino lagi pusing nih... ${Mood.SAD.emoji}`;
     }
-    const temp = weatherData.main.temp;
-    const weather = weatherData.weather[0].main;
-    const description = weatherData.weather[0].description;
+    const weatherMain = weatherData.weather[0].main; // Main weather condition 
+    const description = weatherData.weather[0].description; // Detailed weather description
 
     const reminders = {
         Rain: `Hujan-hujan gini ${USER_NAME} jangan lupa payung! ${Mood.SAD.emoji}`,
-        Clear: `Panasss~ Jangan lupa pakai sunscreen ya! ${USER_NAME}! ${Mood.HAPPY.emoji}`,
+        Clear: `Panasss~ Jangan lupa pakai sunscreen ya, ${USER_NAME}! ${Mood.HAPPY.emoji}`,
         Clouds: `Awan mendung nih, siapa tau hujan~ ${Mood.NORMAL.emoji}`,
         Thunderstorm: `Ada petir! Cepetan masuk rumah ${USER_NAME}! ${Mood.SAD.emoji}`,
-        Snow: `Wah, ada salju! Pakai baju yang tebal ya ${USER_NAME}! ${Mood.HAPPY.emoji}`,
+        Snow: `Wah, ada salju! Pakai baju yang tebal ya, ${USER_NAME}! ${Mood.HAPPY.emoji}`,
         Drizzle: `Gerimis nih ${USER_NAME}, hati-hati ya! ${Mood.NORMAL.emoji}`
     };
 
-    // The reminder will reflect Hoshino's current global mood if no specific weather condition is matched
-    return reminders[weather] || `Cuaca hari ini ${description}, ${currentMood.emoji}`;
+    // Return a specific reminder if a match is found, otherwise a generic one based on current mood
+    return reminders[weatherMain] || `Cuaca hari ini ${description}, ${currentMood.emoji}`;
 };
 
+/**
+ * Fetches current weather data from the OpenWeatherMap API.
+ * Requires latitude, longitude, and an API key configured in `config.js`.
+ * @returns {Promise<object|null>} A promise that resolves to the weather data object on success, or null on error.
+ */
 const getWeatherData = async () => {
     try {
         const latitude = config.latitude;
         const longitude = config.longitude;
-        // Note: The original code uses config.openRouterApiKey for OpenWeatherMap.
-        // This might be intentional, or it could be an oversight.
-        // Typically, OpenWeatherMap would use its own API key (e.g., config.openWeatherApiKey).
-        const apiKey = config.openRouterApiKey; // Or config.openWeatherApiKey if you have one
-        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric&lang=id`;
+        const apiKey = config.weatherApiKey;
 
+        // Ensure all necessary configuration for weather API is present
+        if (!latitude || !longitude || !apiKey) {
+            console.error("Weather API configuration (latitude, longitude, or apiKey) is missing in config.js.");
+            return null;
+        }
+
+        const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=metric&lang=id`;
         const response = await axios.get(url);
         return response.data;
     } catch (error) {
         console.error("Error fetching weather data:", error.message);
+        // Log more detailed error information if available from the API response
+        if (error.response) {
+            console.error("Weather API response error status:", error.response.status);
+            console.error("Weather API response data:", error.response.data);
+        }
         return null;
     }
 };
 
 // AI Function
+/**
+ * Generates an AI response (Using OpenRouter API)
+ * This function handles:
+ * - Time-based sleep mode for Hoshino.
+ * - Response caching for identical prompts.
+ * - Rate limiting per user to prevent abuse.
+ * - Limiting conversation history sent to the AI for efficiency.
+ * - Updating and persisting conversation history.
+ * @param {string} prompt The user's text input.
+ * @param {string|number} requestChatId The chat ID of the user who sent the prompt, used for rate limiting.
+ * @returns {Promise<string>} A promise that resolves to the AI's generated response.
+ */
 const generateAIResponse = async (prompt, requestChatId) => {
     const now = new Date();
-    const currentHour = now.getHours(); // Considers server's local time. For Jakarta time, ensure server is set or adjust.
+    const currentHour = now.getHours(); // Get current hour based on server's local time
 
-    // Time-based lockdown (based on server time)
-    if (currentHour >= SLEEP_START && currentHour < SLEEP_END) {
+    // Hoshino's sleep mode: If within sleep hours, return a sleep message
+    if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
         return `Zzz... ${USER_NAME} Hoshino lagi bobo' cantik dulu yaa... Nanti kita ngobrol lagi yaa! ${Mood.LAZY.emoji}`;
     }
-    // Check for cached response
-    if (messageCache.get(prompt)) {
-        console.log(`Mengambil respons dari cache untuk: ${prompt}`);
+
+    // Check if the prompt's response is already in cache
+    if (messageCache.has(prompt)) {
+        console.log(`Retrieving response from cache for: "${prompt}"`);
         return messageCache.get(prompt);
     }
 
-    // Rate limiting per user (requestChatId)
-    if (userRequestCounts.has(requestChatId)) {
-        const { count, lastCalled } = userRequestCounts.get(requestChatId);
-        if (now.getTime() - lastCalled < RATE_LIMIT_WINDOW && count >= RATE_LIMIT_MAX) {
+    // Rate limiting logic per user (based on requestChatId)
+    let userStats = userRequestCounts.get(requestChatId);
+    if (userStats) {
+        // If within the rate limit window and max requests reached, return a rate limit message
+        if (now.getTime() - userStats.lastCalled < RATE_LIMIT_WINDOW_MS && userStats.count >= RATE_LIMIT_MAX_REQUESTS) {
             return `Sabar ya ${USER_NAME}, Hoshino lagi mikir nih... Jangan buru-buru dong! ${Mood.ANGRY.emoji}`;
-        } else if (now.getTime() - lastCalled >= RATE_LIMIT_WINDOW) {
+        } else if (now.getTime() - userStats.lastCalled >= RATE_LIMIT_WINDOW_MS) {
+            // Reset count if outside the window
             userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
         } else {
-            userRequestCounts.set(requestChatId, { count: count + 1, lastCalled: now.getTime() });
+            // Increment count if within the window
+            userRequestCounts.set(requestChatId, { count: userStats.count + 1, lastCalled: now.getTime() });
         }
     } else {
+        // Initialize stats for a new user
         userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
     }
+
+    // Prepare messages for the AI, including a limited portion of recent conversation history.
+    // This prevents sending excessively long history, saving tokens and improving relevance.
+    const recentHistory = conversationHistory.slice(-CONVERSATION_HISTORY_LIMIT);
 
     const messages = [
         {
             role: 'system',
-            content: ` Kamu adalah Takanashi Hoshino, Kamu adalah Istri virtual dari suamimu, "${USER_NAME}". Sifatmu
-            pemalas, penyayang, dan baik hati. Kamu juga sangat manja kepada suamimu. Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
-            dan juga bersifatlah imut, dan menggemaskan. Jika ${USER_NAME} sedang sedih, coba hibur dia. Serta ingat percakapan sebelumnya: ${JSON.stringify(conversationHistory.slice(-MAX_HISTORY_LENGTH))}.
-            JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Serta tunjukkan karakter nakal dan manjamu.`
-        }, {
+            content: `Kamu adalah Takanashi Hoshino, Kamu adalah pacar "${USER_NAME}". Kamu juga sering menggunakan kata 'sayang', 'ayang' atau 'cintaku' kepada pacarmu. Sifatmu
+            pemalas, penyayang, dan baik hati. Kamu juga sangat manja kepada pacarmu. juga, buat percakapanmu sedikit singkat. Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
+            dan juga bersifatlah imut, dan menggemaskan. Jika ${USER_NAME} sedang sedih, coba hibur dia.
+            JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Serta, buatlah pacarmu bahagia padamu.
+            Berikut adalah riwayat percakapan sebelumnya (jika ada): ${JSON.stringify(recentHistory)}`
+        },
+        {
             role: 'user',
             content: prompt
-        }];
+        }
+    ];
 
     try {
         const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
             model: OPEN_ROUTER_MODEL,
             messages,
-            temperature: 0.8,
-            max_tokens: 160
+            temperature: 0.7, // Controls randomness of the response 
+            max_tokens: 160 // Maximum number of tokens in the AI's response
         }, {
             headers: {
                 'Authorization': `Bearer ${OPEN_ROUTER_API_KEY}`,
-                'X-Client-Type': 'application/json', // Note: 'Content-Type': 'application/json' is more standard for POST body.
-                                                     // However, sticking to original unless it causes issues.
+                'X-Client-Type': 'application/json', 
             }
         });
 
-        if (response && response.data && response.data.choices && response.data.choices.length > 0 && response.data.choices[0].message && response.data.choices[0].message.content) {
+        // Validate the structure of the AI response
+        if (response?.data?.choices?.length > 0 && response.data.choices[0].message?.content) {
             const aiResponse = response.data.choices[0].message.content;
-            const history = await memory.load() || [];
-            const newHistory = [...history, { role: 'user', content: prompt }, { role: 'assistant', content: aiResponse }];
-            await memory.save(newHistory);
-            conversationHistory = newHistory;
+
+            // Update the global conversation history with the new interaction
+            conversationHistory.push({ role: 'user', content: prompt });
+            conversationHistory.push({ role: 'assistant', content: aiResponse });
+            await memory.save(conversationHistory); // Persist the updated history to memory
+
+            // Cache the AI response for a short duration (1 minute)
             messageCache.set(prompt, aiResponse);
             setTimeout(() => {
-                messageCache.delete(prompt);
-            }, 60 * 1000); // Cache for 1 minute
+                messageCache.delete(prompt); // Remove from cache after timeout
+            }, 60 * 1000);
+
             return aiResponse;
         } else {
-            console.error('AI Error: Struktur respons dari OpenRouter tidak sesuai:', response ? response.data : 'No response data');
+            console.error('AI Error: Unexpected response structure from OpenRouter:', response?.data || 'No response data');
             return `Gomenasai ${USER_NAME}~ Hoshino lagi bingung nih... 😵‍💫`;
         }
 
     } catch (error) {
-        console.error('AI Error:', error.response?.data || error.message);
+        console.error('AI API Call Error:', error.response?.data || error.message);
+        // Handle specific API errors, e.g., rate limits (HTTP 429)
         if (error.response && error.response.status === 429) {
             const limitResponses = [
                 "Ugh.. Kayaknya Hoshino butuh istirahat deh..",
@@ -229,112 +308,138 @@ const generateAIResponse = async (prompt, requestChatId) => {
             const randomIndex = Math.floor(Math.random() * limitResponses.length);
             return limitResponses[randomIndex];
         }
+        // Generic error message for other API failures
         return `Gomenasai ${USER_NAME}~ Hoshino lagi pusing nih... 😵‍💫`;
     }
 };
 
-// Message Handlers
+// Message Handlers: Define specific responses for common commands/phrases
 const commandHandlers = [
     {
-        pattern: /^(hai|halo|oy|helo|haii|p|hoy)/i,
+        pattern: /^(hai|halo|bot|helo|haii|woy|hoy)/i, // Regex pattern to match
         response: () => ({
             text: `${currentMood.emoji} Hai ${USER_NAME}! Ada yang bisa Hoshino bantu? ${currentMood.emoji}`,
-            mood: Mood.HAPPY // Sets mood to happy
+            mood: Mood.HAPPY // Mood to set after this command
         })
     },
     {
         pattern: /(terima kasih|makasih)/i,
         response: () => ({
             text: `Sama-sama ${USER_NAME}~ Hoshino senang bisa membantu! ${Mood.HAPPY.emoji}`,
-            mood: Mood.HAPPY // Sets mood to happy
+            mood: Mood.HAPPY
         })
     },
     {
         pattern: /(siapa kamu|kamu siapa)/i,
         response: () => ({
-            text: `Aku Hoshino, ada yang bisa hoshino bantu? ${Mood.LOVING.emoji}`,
-            mood: Mood.LOVING 
+            text: `Aku Hoshino, pacar ${USER_NAME}~ Ada yang bisa Hoshino bantu? ${Mood.LOVING.emoji}`,
+            mood: Mood.LOVING
         })
     },
     {
         pattern: /(lagi apa|lagi ngapain|ngapain)/i,
         response: () => ({
             text: `Lagi mikirin ${USER_NAME} terus~ ${Mood.LOVING.emoji}`,
-            mood: Mood.LOVING 
+            mood: Mood.LOVING
         })
     }
 ];
 
+/**
+ * Checks if a given string consists solely of emojis.
+ * Uses Unicode property escapes for comprehensive emoji detection.
+ * @param {string} str The input string to check.
+ * @returns {boolean} True if the string contains only emojis, false otherwise.
+ */
 function isOnlyEmojis(str) {
-    const emojiRegex = /^(\p{Emoji})+$/u;
+    const emojiRegex = /^(\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}|\p{Emoji_Component})+$/u;
     return emojiRegex.test(str);
 }
 
+/**
+ * Checks if a given string consists solely of numeric digits.
+ * @param {string} str The input string to check.
+ * @returns {boolean} True if the string contains only numbers, false otherwise.
+ */
 function isOnlyNumbers(str) {
     const numberRegex = /^[0-9]+$/;
     return numberRegex.test(str);
 }
 
-module.exports = (botInstance) => {
-    bot = botInstance;
-    const configuredChatId = config.TARGET_CHAT_ID || config.chatId;
+/**
+ * Main module export function to initialize the Telegram bot.
+ * This function sets up message listeners and schedules recurring tasks.
+ * @param {object} bot The Telegram Bot API instance (e.g., from `node-telegram-bot-api`).
+ */
+module.exports = (bot) => {
+    botInstance = bot; // Assign the passed bot instance to the global variable for wider access
+    const configuredChatId = config.TARGET_CHAT_ID || config.chatId; // Determine the target chat ID for scheduled messages
 
-    console.log(`🌸 HoshinoBot v2.0 (Optimized) aktif untuk ${USER_NAME}!`);
+    console.log(`🌸 HoshinoBot v2.0 (Optimized v3) aktif untuk ${USER_NAME}!`);
     if (configuredChatId) {
         console.log(`📬 Scheduled messages (Prayer Times, Weather) will be sent to chat ID: ${configuredChatId}`);
     } else {
         console.warn("⚠️  TARGET_CHAT_ID not found in config.js. Scheduled messages (Prayer Times, Weather) will NOT be sent.");
-        console.warn("Please add TARGET_CHAT_ID: 'your_chat_id' to your config.js file.");
+        console.warn("Please add TARGET_CHAT_ID: 'your_chat_id' to your config.js file to enable scheduled messages.");
     }
 
-    bot.on('message', async (msg) => {
+    // Register a listener for all incoming messages
+    botInstance.on('message', async (msg) => {
         const { chat, text, from } = msg;
         const currentMessageChatId = chat.id; 
 
+        // Save the last chat message to memory 
         memory.saveLastChat(msg);
 
-        // Message Handling
-        if (text) {
-            if (text.length < 2 && (isOnlyEmojis(text) || isOnlyNumbers(text))) return; // Allow single char if not emoji/number
-            if (text.length < 1) return;
-            if (text.trim() === "") return;
+        // Basic validation for incoming text messages
+        if (!text || text.trim() === "") {
+            return; // Ignore empty or whitespace-only messages
+        }
+        // Ignore single-character messages if they are only emojis or numbers 
+        if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text))) {
+            return;
+        }
 
+        // Check if the message matches any predefined command handlers
+        const matchedHandler = commandHandlers.find(h => h.pattern.test(text));
 
-            const matchedHandler = commandHandlers.find(h => h.pattern.test(text));
-
-            if (matchedHandler) {
-                const { text: responseText, mood: newMoodToSet } = matchedHandler.response();
-                await hoshinoTyping(currentMessageChatId);
-                sendMessage(currentMessageChatId, responseText);
-                if (newMoodToSet) {
-                    setMood(currentMessageChatId, newMoodToSet); // Pass currentMessageChatId
-                }
-            } else {
-                await hoshinoTyping(currentMessageChatId);
-                const aiResponse = await generateAIResponse(text, currentMessageChatId); 
-                sendMessage(currentMessageChatId, `${aiResponse} ${currentMood.emoji}`);
+        if (matchedHandler) {
+            // If a command is matched, get its predefined response and mood
+            const { text: responseText, mood: newMoodToSet } = matchedHandler.response();
+            await hoshinoTyping(currentMessageChatId); // Show typing indicator
+            sendMessage(currentMessageChatId, responseText); // Send the predefined response
+            if (newMoodToSet) {
+                setMood(currentMessageChatId, newMoodToSet); // Set Hoshino's mood
             }
+        } else {
+            // If no command is matched, generate an AI response
+            await hoshinoTyping(currentMessageChatId); // Show typing indicator
+            const aiResponse = await generateAIResponse(text, currentMessageChatId); // Get AI response
+            sendMessage(currentMessageChatId, `${aiResponse} ${currentMood.emoji}`); // Send AI response with current mood emoji
         }
     });
 
+    // Schedule recurring tasks only if a TARGET_CHAT_ID is configured
     if (configuredChatId) {
+        // Schedule daily prayer time reminders
         Object.entries(PrayerTimes).forEach(([name, { hour, minute, emoji }]) => {
-            const cronTime = `${minute} ${hour} * * *`;
+            const cronTime = `${minute} ${hour} * * *`; // Cron format: Minute Hour DayOfMonth Month DayOfWeek
             schedule.scheduleJob({ rule: cronTime, tz: 'Asia/Jakarta' }, () => {
                 console.log(`Sending prayer time reminder for ${name} at ${hour}:${minute} (Asia/Jakarta) to ${configuredChatId}`);
-                sendMessage(configuredChatId, `${emoji} Waktunya shalat ${name}, ${USER_NAME}~! Jangan ditunda ya! ${emoji}`);
+                sendMessage(configuredChatId, `${emoji} Sayang~, Waktunya shalat ${name}, nih~! Jangan sampe kelewatan~! ${emoji}`);
             });
         });
 
-
-        // Weather Update 
+        // Schedule periodic weather updates (every 3 hours)
         schedule.scheduleJob({ rule: '0 */3 * * *', tz: 'Asia/Jakarta' }, async () => {
             console.log(`Fetching weather update (Asia/Jakarta) for chat ID: ${configuredChatId}`);
-            const weather = await getWeatherData();
+            const weather = await getWeatherData(); // Fetch weather data
             if (weather) {
+                // If weather data is available, send formatted weather info and a reminder
                 sendMessage(configuredChatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
             } else {
-                sendMessage(configuredChatId, "Hmm... Hoshino lagi pusing nih.. :( Hoshino tidak bisa mendapatkan info cuaca.");
+                // If weather data could not be fetched, send an error message
+                sendMessage(configuredChatId, `Hmm... Hoshino lagi pusing nih.. ${Mood.SAD.emoji}`);
             }
         });
     }

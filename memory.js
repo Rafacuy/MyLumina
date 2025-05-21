@@ -6,7 +6,7 @@ const MEMORY_FILE = path.join(__dirname, 'memory.json');
 const BACKUP_DIR = path.join(__dirname, 'backups');
 const MAX_HISTORY_LENGTH = 100; // Maks cuma 100 pesan
 const BACKUP_RETENTION = 3; // Jumlah backup 
-const TARGET_USER_NAME = 'Arash'; // Nama p
+const TARGET_USER_NAME = 'Arash'; // Nama 
 
 let saveQueue = Promise.resolve();
 
