@@ -190,8 +190,8 @@ const generateAIResponse = async (prompt, requestChatId) => {
         const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
             model: OPEN_ROUTER_MODEL,
             messages,
-            temperature: 0.7,
-            max_tokens: 140
+            temperature: 0.8,
+            max_tokens: 160
         }, {
             headers: {
                 'Authorization': `Bearer ${OPEN_ROUTER_API_KEY}`,
