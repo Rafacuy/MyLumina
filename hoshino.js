@@ -277,8 +277,6 @@ function isOnlyNumbers(str) {
 
 module.exports = (botInstance) => {
     bot = botInstance;
-    // Attempt to get TARGET_CHAT_ID from config.js
-    // You can name it TARGET_CHAT_ID or just chatId in your config.
     const configuredChatId = config.TARGET_CHAT_ID || config.chatId;
 
     console.log(`🌸 HoshinoBot v2.0 (Optimized) aktif untuk ${USER_NAME}!`);
@@ -291,15 +289,12 @@ module.exports = (botInstance) => {
 
     bot.on('message', async (msg) => {
         const { chat, text, from } = msg;
-        const currentMessageChatId = chat.id; // Use this for operations related to this specific message
+        const currentMessageChatId = chat.id; 
 
-        // Optionally, save the last interacted chat ID if you want to "learn" it,
-        // though scheduled tasks now rely on configuredChatId.
         memory.saveLastChat(msg);
 
         // Message Handling
         if (text) {
-            // Basic validation: ignore very short messages, emoji-only, number-only, or empty.
             if (text.length < 2 && (isOnlyEmojis(text) || isOnlyNumbers(text))) return; // Allow single char if not emoji/number
             if (text.length < 1) return;
             if (text.trim() === "") return;
@@ -316,15 +311,13 @@ module.exports = (botInstance) => {
                 }
             } else {
                 await hoshinoTyping(currentMessageChatId);
-                const aiResponse = await generateAIResponse(text, currentMessageChatId); // Pass currentMessageChatId for rate limiting
+                const aiResponse = await generateAIResponse(text, currentMessageChatId); 
                 sendMessage(currentMessageChatId, `${aiResponse} ${currentMood.emoji}`);
             }
         }
     });
 
-    // Scheduled tasks will only run if configuredChatId is set.
     if (configuredChatId) {
-        // Jadwalkan pengingat waktu sholat with Asia/Jakarta timezone
         Object.entries(PrayerTimes).forEach(([name, { hour, minute, emoji }]) => {
             const cronTime = `${minute} ${hour} * * *`;
             schedule.scheduleJob({ rule: cronTime, tz: 'Asia/Jakarta' }, () => {
