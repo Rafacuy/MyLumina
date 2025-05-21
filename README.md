@@ -6,7 +6,7 @@ HOSHINO is a personalized AI companion Telegram bot designed to act as your "gir
 
 These instructions will guide you through setting up and running HOSHINO on your local machine for development and testing.
 
-### Prerequisites
+## Prerequisites
 
 Before you begin, ensure you have the following:
 
@@ -16,20 +16,20 @@ Before you begin, ensure you have the following:
 - **OpenWeatherMap API Key**: For weather updates, Hoshino integrates with OpenWeatherMap. Obtain an API key from [OpenWeatherMap](OpenWeatherMap.org)
 - **Your Telegram Chat ID**: This is required for Hoshino to send scheduled messages (prayer times, weather updates) to a specific chat.
 
-### Installation
+## Installation
 
 Follow these steps to get your HOSHINO bot up and running:
 
-1. **Clone the repository**:
+### 1. **Clone the repository**:
 ```
 git clone https://www.google.com/search?q=https://github.com/Rafacuy/HOSHINO-v2.0-Optimized.git
 cd HOSHINO-v2.0-Optimized 
 ```
-2. **Install dependencies**:
+### 2. **Install dependencies**:
 ```
 npm install
 ``` 
-3. **Configure config.js: Create a config.js file in the root directory.**
+### 3. **Configure config.js: Create a config.js file in the root directory.**
 Example:
 
 ```js
@@ -53,12 +53,12 @@ module.exports = {
 - latitude and longitude: The geographic coordinates for which you want weather updates.
 - TARGET_CHAT_ID: The chat ID where Hoshino will send scheduled messages like prayer times and weather updates.
 
-4. Customize hoshino.js **(Optional)**:
-- You can change **USER_NAME** to the name of the user Hoshino will interact with (default: 'Arash').
-- **Adjust MOOD_TIMEOUT_MS** to change how long Hoshino's mood lasts before resetting to 'NORMAL' (default: 2 days).
-- **Modify SLEEP_START_HOUR** and **SLEEP_END_HOUR** to set Hoshino's sleep schedule (default: 00:00 - 04:00).
-- **RATE_LIMIT_WINDOW_MS** and **RATE_LIMIT_MAX_REQUESTS** control the rate limiting behavior.
-- **CONVERSATION_HISTORY_LIMIT** defines how many recent messages are sent to the AI for context (default: 10).
+### 4. Customize hoshino.js **(Optional)**:
+- You can change `USER_NAME` to the name of the user Hoshino will interact with (default: 'Arash').
+- `Adjust MOOD_TIMEOUT_MS` to change how long Hoshino's mood lasts before resetting to 'NORMAL' (default: 2 days).
+- `Modify SLEEP_START_HOUR` and `SLEEP_END_HOUR` to set Hoshino's sleep schedule (default: 00:00 - 04:00).
+- `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` control the rate limiting behavior.
+- `CONVERSATION_HISTORY_LIMIT` defines how many recent messages are sent to the AI for context (default: 10).
 
 ## Usage
 
@@ -98,6 +98,6 @@ To deploy HOSHINO on a live system, you would typically use a process manager li
 - Develop by: Arash
 - TikTok: @rafardhancuy
 - Github: https://github.com/Rafacuy
-**License**: This project is licensed under the MIT License.
 
----
+- **License**: This project is licensed under the MIT License.
+
