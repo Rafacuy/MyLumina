@@ -12,8 +12,8 @@ Before you begin, ensure you have the following:
 
 - **Node.js**: The bot is built with Node.js. Make sure you have it installed on your system.
 - **Telegram Bot Token**: You'll need to create a new bot via BotFather on Telegram to obtain your unique API token.
-- **OpenRouter API Key**: Hoshino uses OpenRouter for its AI capabilities. You'll need an API key from [OpenRouter](OpenRouter.ai)
-- **OpenWeatherMap API Key**: For weather updates, Hoshino integrates with OpenWeatherMap. Obtain an API key from [OpenWeatherMap](OpenWeatherMap.org)
+- **OpenRouter API Key**: Hoshino uses OpenRouter for its AI capabilities. You'll need an API key from [OpenRouter](https://OpenRouter.ai)
+- **OpenWeatherMap API Key**: For weather updates, Hoshino integrates with OpenWeatherMap. Obtain an API key from [OpenWeatherMap](https://OpenWeatherMap.org)
 - **Your Telegram Chat ID**: This is required for Hoshino to send scheduled messages (prayer times, weather updates) to a specific chat.
 
 ## Installation
@@ -22,8 +22,8 @@ Follow these steps to get your HOSHINO bot up and running:
 
 ### 1. **Clone the repository**:
 ```
-git clone https://www.google.com/search?q=https://github.com/Rafacuy/hoshino-chatbot.git
-cd HOSHINO-v2.0-Optimized 
+git clone https://github.com/Rafacuy/hoshino-chatbot.git
+cd hoshino-chatbot
 ```
 ### 2. **Install dependencies**:
 ```
@@ -43,10 +43,10 @@ LONGITUDE=106.816666 # Change it to your location LONGITUDE (default Jakarta)
 ```
 
 - `TELEGRAM_BOT_TOKEN`: Your Telegram Bot API token from BotFather.
-- `OPENROUTER_API_KEY`: Your API key from [OpenRouter](openrouter.ai)
+- `OPENROUTER_API_KEY`: Your API key from [OpenRouter](https://openrouter.ai)
 - `OPENROUTER_MODEL`: The specific AI model you want to use from OpenRouter (e.g., meta-llama/llama-3.1-8b-instruct).
 - `TARGET_CHAT_ID`: The chat ID where Hoshino will send scheduled messages like prayer times and weather updates
-- `WEATHER_API_KEY`: Your API key from [OpenWeatherMap](OpenWeatherMap.org)
+- `WEATHER_API_KEY`: Your API key from [OpenWeatherMap](https://OpenWeatherMap.org)
 - `LATITUDE` and `LONGITUDE`: The geographic coordinates for which you want weather updates.
 
 
