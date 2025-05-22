@@ -5,7 +5,7 @@
 // LANGUAGE: ID (Indonesia)
 // TIME FORMAT: Asia/jakarta
 // MIT License 
-
+ 
 // IMPORTANT!
 const axios = require('axios').default;
 const config = require('./config'); // Configuration File (API, ChatID, etc)
@@ -22,7 +22,7 @@ const RATE_LIMIT_WINDOW_MS = 20 * 1000; // Rate limit window: 20 seconds
 const RATE_LIMIT_MAX_REQUESTS = 3; // Max requests allowed within the rate limit window per user
 const SLEEP_START_HOUR = 0; // Hoshino's sleep start time (00:00 - midnight)
 const SLEEP_END_HOUR = 4;   // Hoshino's sleep end time (04:00 - 4 AM)
-const CONVERSATION_HISTORY_LIMIT = 10; // Limits the number of recent messages sent to AI 
+const CONVERSATION_HISTORY_LIMIT = 3; // Limits the number of recent messages sent to AI (default is 3)
 
 // Prayer Times (Configured for Asia/Jakarta timezone)
 const PrayerTimes = {
@@ -40,7 +40,7 @@ const Mood = {
     ANGRY: { emoji: '😠', name: 'Angry' },
     LAZY: { emoji: '😪', name: 'Lazy' },
     LOVING: { emoji: '💖', name: 'Loving' },
-    NORMAL: { emoji: '�', name: 'Normal' }
+    NORMAL: { emoji: '>-<', name: 'Normal' }
 };
 
 // Global State Variables
