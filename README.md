@@ -12,7 +12,7 @@ Before you begin, ensure you have the following:
 
 - **Node.js**: The bot is built with Node.js. Make sure you have it installed on your system.
 - **Telegram Bot Token**: You'll need to create a new bot via BotFather on Telegram to obtain your unique API token.
-- **OpenRouter API Key**: Hoshino uses OpenRouter for its AI capabilities. You'll need an API key from OpenRouter.ai.
+- **OpenRouter API Key**: Hoshino uses OpenRouter for its AI capabilities. You'll need an API key from [OpenRouter](OpenRouter.ai)
 - **OpenWeatherMap API Key**: For weather updates, Hoshino integrates with OpenWeatherMap. Obtain an API key from [OpenWeatherMap](OpenWeatherMap.org)
 - **Your Telegram Chat ID**: This is required for Hoshino to send scheduled messages (prayer times, weather updates) to a specific chat.
 
@@ -22,36 +22,33 @@ Follow these steps to get your HOSHINO bot up and running:
 
 ### 1. **Clone the repository**:
 ```
-git clone https://www.google.com/search?q=https://github.com/Rafacuy/HOSHINO-v2.0-Optimized.git
+git clone https://www.google.com/search?q=https://github.com/Rafacuy/hoshino-chatbot.git
 cd HOSHINO-v2.0-Optimized 
 ```
 ### 2. **Install dependencies**:
 ```
 npm install
 ``` 
-### 3. **Configure config.js: Create a config.js file in the root directory.**
+### 3. **Configure dotenv: Create a '.env' (dotenv) file in the root directory.**
 Example:
 
-```js
-// config.js
-module.exports = {
-    telegramBotToken: 'YOUR_TELEGRAM_BOT_TOKEN', // Your Telegram Bot API token
-    openRouterApiKey: 'YOUR_OPENROUTER_API_KEY', // API key for OpenRouter AI
-    openRouterModel: 'meta-llama/llama-3.1-8b-instruct', // The AI model (e.g., meta-llama/llama-3.1-8b-instruct)
-    weatherApiKey: 'YOUR_OPENWEATHERMAP_API_KEY', // API key for OpenWeatherMap
-    latitude: -6.2088, // Latitude for weather updates (Example: Jakarta)
-    longitude: 106.8456, // Longitude for weather updates (Example: Jakarta)
-    TARGET_CHAT_ID: 'YOUR_TARGET_CHAT_ID', // The Telegram chat ID for scheduled messages
-    chatId: 'YOUR_TARGET_CHAT_ID' // Redundant, but kept for compatibility. TARGET_CHAT_ID is preferred.
-};
+```bash
+TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_TOKEN # Change it to your actual telegram bot token
+OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY # Change it to your actual OpenRouter API key
+OPENROUTER_MODEL=meta-llama/llama-3.3-8b-instruct:free # Change it to model that you want to use
+TARGET_CHAT_ID=YOUR_CHAT_ID # Change it to your ChatID
+WEATHER_API_KEY=YOUR_WEATHER_KEY # Change it to your actual OpenWeatherMap API
+LATITUDE=-6.200000 # Change it to your location LATITUDE (default Jakarta)
+LONGITUDE=106.816666 # Change it to your location LONGITUDE (default Jakarta)
 ```
 
-- telegramBotToken: Your Telegram Bot API token from BotFather.
-- openRouterApiKey: Your API key from OpenRouter.
-- openRouterModel: The specific AI model you want to use from OpenRouter (e.g., meta-llama/llama-3.1-8b-instruct).
-- weatherApiKey: Your API key from OpenWeatherMap.
-- latitude and longitude: The geographic coordinates for which you want weather updates.
-- TARGET_CHAT_ID: The chat ID where Hoshino will send scheduled messages like prayer times and weather updates.
+- `TELEGRAM_BOT_TOKEN`: Your Telegram Bot API token from BotFather.
+- `OPENROUTER_API_KEY`: Your API key from [OpenRouter](openrouter.ai)
+- `OPENROUTER_MODEL`: The specific AI model you want to use from OpenRouter (e.g., meta-llama/llama-3.1-8b-instruct).
+- `TARGET_CHAT_ID`: The chat ID where Hoshino will send scheduled messages like prayer times and weather updates
+- `WEATHER_API_KEY`: Your API key from [OpenWeatherMap](OpenWeatherMap.org)
+- `LATITUDE` and `LONGITUDE`: The geographic coordinates for which you want weather updates.
+
 
 ### 4. Customize hoshino.js **(Optional)**:
 - You can change `USER_NAME` to the name of the user Hoshino will interact with (default: 'Arash').
@@ -69,14 +66,14 @@ Once the bot is running, you can interact with Hoshino in your Telegram chat.
 node index.js
 ```
 
-- General Chat: Send any message to Hoshino, and she will respond based on her AI model, personality, and current mood.
-- Predefined Commands: Hoshino has specific responses for certain phrases:
+- **General Chat**: Send any message to Hoshino, and she will respond based on her AI model, personality, and current mood.
+- **Predefined Commands**: Hoshino has specific responses for certain phrases:
     - `hai, halo, bot, helo, haii, woy, hoy`: Hoshino will greet you happily.
     - `terima kasih, makasih`: Hoshino will express happiness to have helped.
     - `siapa kamu, kamu siapa`: Hoshino will introduce herself as your girlfriend.
     - `lagi apa, lagi ngapain, ngapain`: Hoshino will give a loving response about thinking of you.
 
-- Scheduled Messages: If `TARGET_CHAT_ID` is configured, Hoshino will automatically send:
+- **Scheduled Messages**: If `TARGET_CHAT_ID` is configured, Hoshino will automatically send:
     - Daily prayer time reminders for Subuh, Dzuhur, Ashar, Maghrib, and Isya (Asia/Jakarta timezone).
     - Periodic weather updates and personalized weather-based reminders (every 3 hours).   
 
@@ -96,8 +93,8 @@ To deploy HOSHINO on a live system, you would typically use a process manager li
 ### Author
 
 - Develop by: Arash
-- TikTok: @rafardhancuy
-- Github: https://github.com/Rafacuy
+- TikTok: [TikTok](https://www.tiktok.com/search?q=rafardhancuy&t=1745672568098)
+- Github: [Github/Rafacuy](https://github.com/Rafacuy)
 
 - **License**: This project is licensed under the MIT License.
 
