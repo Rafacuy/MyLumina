@@ -1,16 +1,17 @@
-// HOSHINO v2.0 (Optimized) 
+// hoshino.js
+// HOSHINO v2.0 (Optimized)
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
 // LANGUAGE: ID (Indonesia)
 // TIME FORMAT: Asia/jakarta
-// MIT License 
- 
+// MIT License
+
 // IMPORTANT!
 const axios = require('axios').default;
 const config = require('./config'); // Configuration File (API, ChatID, etc)
 const sendMessage = require('./utils/sendMessage'); // Utility functions (for sending message)
-const memory = require('./memory'); // memory files, handling memory functions (including save, load, etc) 
+const memory = require('./memory'); // memory files, handling memory functions (including save, load, etc)
 const schedule = require('node-schedule'); //  scheduling tasks like prayer times and weather updates
 
 // 🌸 Hoshino Configuration Constants
@@ -22,7 +23,7 @@ const RATE_LIMIT_WINDOW_MS = 20 * 1000; // Rate limit window: 20 seconds
 const RATE_LIMIT_MAX_REQUESTS = 3; // Max requests allowed within the rate limit window per user
 const SLEEP_START_HOUR = 0; // Hoshino's sleep start time (00:00 - midnight)
 const SLEEP_END_HOUR = 4;   // Hoshino's sleep end time (04:00 - 4 AM)
-const CONVERSATION_HISTORY_LIMIT = 3; // Limits the number of recent messages sent to AI (default is 3)
+const CONVERSATION_HISTORY_LIMIT = 3; // Limits the number of recent messages sent to AI
 
 // Prayer Times (Configured for Asia/Jakarta timezone)
 const PrayerTimes = {
@@ -33,14 +34,14 @@ const PrayerTimes = {
     Isya: { hour: 19, minute: 0, emoji: '🌌' }
 };
 
-// Mood Definitions 
+// Mood Definitions
 const Mood = {
     HAPPY: { emoji: '>.<', name: 'Happy' },
     SAD: { emoji: '😢', name: 'Sad' },
     ANGRY: { emoji: '😠', name: 'Angry' },
     LAZY: { emoji: '😪', name: 'Lazy' },
     LOVING: { emoji: '💖', name: 'Loving' },
-    NORMAL: { emoji: '>-<', name: 'Normal' }
+    NORMAL: { emoji: '>~<', name: 'Normal' }
 };
 
 // Global State Variables
@@ -51,7 +52,7 @@ let conversationHistory = []; // Stores the full conversation history for persis
 let messageCache = new Map(); // Caches AI responses to avoid redundant API calls for identical prompts
 let userRequestCounts = new Map(); // Tracks request counts for rate limiting per user
 
-// Load conversation history 
+// Load conversation history
 memory.load().then(data => {
     conversationHistory = data || [];
     console.log(`Loaded ${conversationHistory.length} messages from memory.`);
@@ -138,7 +139,7 @@ const getWeatherString = (weatherData) => {
 };
 
 /**
- * Provides a personalized weather-based reminder 
+ * Provides a personalized weather-based reminder
  * The reminder adapts based on the main weather condition.
  * @param {object} weatherData The weather data object from OpenWeatherMap API.
  * @returns {string} A personalized reminder message related to the weather.
@@ -148,12 +149,12 @@ const getWeatherReminder = (weatherData) => {
     if (!weatherData?.main || !weatherData?.weather?.length) {
         return `Maaf, ${USER_NAME}... Hoshino lagi pusing nih... ${Mood.SAD.emoji}`;
     }
-    const weatherMain = weatherData.weather[0].main; // Main weather condition 
+    const weatherMain = weatherData.weather[0].main; // Main weather condition
     const description = weatherData.weather[0].description; // Detailed weather description
 
     const reminders = {
         Rain: `Hujan-hujan gini ${USER_NAME} jangan lupa payung! ${Mood.SAD.emoji}`,
-        Clear: `Panasss~ Jangan lupa pakai sunscreen ya, ${USER_NAME}! ${Mood.HAPPY.emoji}`,
+        Clear: `Cuacanya cerah~, cocok buat produktivitas nih, ${USER_NAME}! ${Mood.HAPPY.emoji}`,
         Clouds: `Awan mendung nih, siapa tau hujan~ ${Mood.NORMAL.emoji}`,
         Thunderstorm: `Ada petir! Cepetan masuk rumah ${USER_NAME}! ${Mood.SAD.emoji}`,
         Snow: `Wah, ada salju! Pakai baju yang tebal ya, ${USER_NAME}! ${Mood.HAPPY.emoji}`,
@@ -248,8 +249,8 @@ const generateAIResponse = async (prompt, requestChatId) => {
     const messages = [
         {
             role: 'system',
-            content: `Kamu adalah Takanashi Hoshino, Kamu adalah pacar "${USER_NAME}". Kamu juga sering menggunakan kata 'sayang', 'ayang' atau 'cintaku' kepada pacarmu. Sifatmu
-            pemalas, penyayang, dan baik hati. Kamu juga sangat manja kepada pacarmu. juga, buat percakapanmu sedikit singkat. Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
+            content: `Kamu adalah Takanashi Hoshino, Kamu adalah pacar "${USER_NAME}". Kamu juga sering menggunakan kata 'sayang' atau 'cintaku' kepada pacarmu. Sifatmu
+            pemalas, penyayang, dan baik hati. Kamu juga sangat manja/sayang kepada pacarmu. juga, buat percakapanmu singkat (sesuaikan). Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
             dan juga bersifatlah imut, dan menggemaskan. Jika ${USER_NAME} sedang sedih, coba hibur dia.
             JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Serta, buatlah pacarmu bahagia padamu.
             Berikut adalah riwayat percakapan sebelumnya (jika ada): ${JSON.stringify(recentHistory)}`
@@ -264,12 +265,12 @@ const generateAIResponse = async (prompt, requestChatId) => {
         const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
             model: OPEN_ROUTER_MODEL,
             messages,
-            temperature: 0.7, // Controls randomness of the response 
+            temperature: 0.7, // Controls randomness of the response
             max_tokens: 160 // Maximum number of tokens in the AI's response
         }, {
             headers: {
                 'Authorization': `Bearer ${OPEN_ROUTER_API_KEY}`,
-                'X-Client-Type': 'application/json', 
+                'X-Client-Type': 'application/json',
             }
         });
 
@@ -366,6 +367,68 @@ function isOnlyNumbers(str) {
     return numberRegex.test(str);
 }
 
+// Sad Song Data
+const sadSongs = [
+    {
+        "title": "Car's Outside - James Arthur",
+        "url": "https://www.youtube.com/watch?v=v27COkZT4GY&pp=ygULY2FyIG91dHNpZGU%3D",
+        "reason": "Lagu buat kamu yang udah nyampe tapi nggak bisa ketemu, karena keadaan nggak pernah berpihak."
+    },
+    {
+        "title": "Keane - Somewhere Only We Know (Official Music Video)",
+        "url": "http://www.youtube.com/watch?v=Oextk-If8HQ",
+        "reason": "Kalau kamu pernah punya tempat rahasia bareng seseorang, tapi sekarang cuma tinggal kenangan."
+    },
+    {
+        "title": "Armada - Asal Kau Bahagia (Official Lyric Video)",
+        "url": "http://www.youtube.com/watch?v=py6GDNgye6k",
+        "reason": "Saat mencintai harus rela ngelepas, karena yang kamu cintai lebih bahagia tanpa kamu."
+    },
+    {
+        "title": "Armada - Hargai Aku (Official Music Video)",
+        "url": "http://www.youtube.com/watch?v=9B7UcTBJYCA",
+        "reason": "Tentang rasa lelah dicintai sepihak dan harapan kecil agar kamu dilihat dan dihargai."
+    },
+    {
+         "title": "Impossible - James Arthur [Speed up] | (Lyrics & Terjemahan)",
+        "url": "http://www.youtube.com/watch?v=p6om2S-ZpRY",
+        "reason": "Cerita tentang cinta yang udah hancur, tapi sisa sakitnya tetap tinggal selamanya."
+    },
+    {
+        "title": "Daun Jatuh - Resah Jadi Luka (Official Audio)",
+        "url": "http://www.youtube.com/watch?v=tOMFR0nQt48",
+        "reason": "Ketika rasa resah nggak pernah reda, dan akhirnya berubah jadi luka yang dalam."
+    },
+    {
+        "title": "Keisya Levronka - Tak Ingin Usai (Official Lyric Video)",
+        "url": "http://www.youtube.com/watch?v=FB1YNEOspyA",
+        "reason": "Karena nggak semua pertemuan bisa selamanya, meski kamu nggak mau itu berakhir."
+    },
+    {
+        "title": "VIONITA - DIA MASA LALUMU, AKU MASA DEPANMU (OFFICIAL MUSIC VIDEO)",
+        "url": "http://www.youtube.com/watch?v=05wQrmLejyo",
+        "reason": "Untuk seseorang yang belum bisa lepas dari masa lalu, padahal masa depannya udah di depan mata."
+    }
+];
+
+/**
+ * Selects a random sad song from the list.
+ * @returns {object} An object containing the title and URL of a random sad song.
+ */
+const getRandomSadSong = () => {
+    const randomIndex = Math.floor(Math.random() * sadSongs.length);
+    return sadSongs[randomIndex];
+};
+
+/**
+ * Sends a random sad song notification.
+ * @param {string|number} chatId The chat ID to send the notification to.
+ */
+const sendSadSongNotification = (chatId) => {
+    const song = getRandomSadSong();
+    sendMessage(chatId, `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`);
+};
+
 /**
  * Main module export function to initialize the Telegram bot.
  * This function sets up message listeners and schedules recurring tasks.
@@ -377,25 +440,25 @@ module.exports = (bot) => {
 
     console.log(`🌸 HoshinoBot v2.0 (Optimized v3) aktif untuk ${USER_NAME}!`);
     if (configuredChatId) {
-        console.log(`📬 Scheduled messages (Prayer Times, Weather) will be sent to chat ID: ${configuredChatId}`);
+        console.log(`📬 Scheduled messages (Prayer Times, Weather, Sad Song) will be sent to chat ID: ${configuredChatId}`);
     } else {
-        console.warn("⚠️  TARGET_CHAT_ID not found in config.js. Scheduled messages (Prayer Times, Weather) will NOT be sent.");
+        console.warn("⚠️  TARGET_CHAT_ID not found in config.js. Scheduled messages (Prayer Times, Weather, Sad Song) will NOT be sent.");
         console.warn("Please add TARGET_CHAT_ID: 'your_chat_id' to your config.js file to enable scheduled messages.");
     }
 
     // Register a listener for all incoming messages
     botInstance.on('message', async (msg) => {
         const { chat, text, from } = msg;
-        const currentMessageChatId = chat.id; 
+        const currentMessageChatId = chat.id;
 
-        // Save the last chat message to memory 
+        // Save the last chat message to memory
         memory.saveLastChat(msg);
 
         // Basic validation for incoming text messages
         if (!text || text.trim() === "") {
             return; // Ignore empty or whitespace-only messages
         }
-        // Ignore single-character messages if they are only emojis or numbers 
+        // Ignore single-character messages if they are only emojis or numbers
         if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text))) {
             return;
         }
@@ -426,7 +489,7 @@ module.exports = (bot) => {
             const cronTime = `${minute} ${hour} * * *`; // Cron format: Minute Hour DayOfMonth Month DayOfWeek
             schedule.scheduleJob({ rule: cronTime, tz: 'Asia/Jakarta' }, () => {
                 console.log(`Sending prayer time reminder for ${name} at ${hour}:${minute} (Asia/Jakarta) to ${configuredChatId}`);
-                sendMessage(configuredChatId, `${emoji} Sayang~, Waktunya shalat ${name}, nih~! Jangan sampe kelewatan~! ${emoji}`);
+                sendMessage(configuredChatId, `${emoji} Sayang~, Waktunya shalat ${name}, nih~ Jangan sampe kelewatan! ${emoji}`);
             });
         });
 
@@ -441,6 +504,11 @@ module.exports = (bot) => {
                 // If weather data could not be fetched, send an error message
                 sendMessage(configuredChatId, `Hmm... Hoshino lagi pusing nih.. ${Mood.SAD.emoji}`);
             }
+        });
+
+        schedule.scheduleJob({ rule: '0 23 * * *', tz: 'Asia/Jakarta' }, () => {
+            console.log(`Sending sad song notification at 22:00 (Asia/Jakarta) to ${configuredChatId}`);
+            sendSadSongNotification(configuredChatId);
         });
     }
 };
