@@ -1,6 +1,37 @@
-# HOSHINO ChatBot v2.0 (Optimized)
+![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
+![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-HOSHINO is a personalized AI companion Telegram bot designed to act as your "girlfriend," Takanashi Hoshino. She is characterized by a lazy, affectionate, kind, and cute personality, with her conversations dynamically influenced by her current mood. The bot provides personalized reminders, AI-powered chat responses, and is optimized for efficient API usage through rate limiting and response caching.
+# 💖 HoshinoBot v3.0 – Memory of Love Edition
+
+> Telegram ChatBot smart, spoiled, and mature virtual girlfriend~
+> Built with love, by [@rafardhancuy](https://github.com/rafacuy)
+> MIT License | Bahasa Indonesia 🇮🇩 | Full Offline-Compatible
+
+---
+
+## ✨ What's New in v3.0?
+
+🔥 **Big Update "Memory of Love"**
+-  **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
+- 💾 **Ring Buffer + Archival**: History is automatically archived, without RAM being broken
+- ⏰ **Dynamic DeepTalk Mode**: Enter chat mode every 21.00 - 04.00
+- 📦 **Cache, Limit, Schedule, Backup**: All are optimal & save free VPS resources
+- 💬 **Automatic AI Context from `memory.js`**, no redundant state, no drama
+
+---
+
+##  Main Features
+
+- 💬 AI ChatBot with OpenRouter (Meta, Claude, etc)
+-  Weather Info & Weather Reminder
+- 🙏 Automatic Prayer Schedule
+- 🎶 Sad Song Recommendations
+- 🎭 Dynamic Mood System
+- ⏳ Auto Cache + Rate Limiter
+- 🧠 Custom Memory Layer (Fully Open Source)
+- 💌 Deep-Talk / Curhat Mode
+
+---
 
 ## Getting Started
 
@@ -38,8 +69,8 @@ OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY # Change it to your actual OpenRouter
 OPENROUTER_MODEL=meta-llama/llama-3.3-8b-instruct:free # Change it to model that you want to use
 TARGET_CHAT_ID=YOUR_CHAT_ID # Change it to your ChatID
 WEATHER_API_KEY=YOUR_WEATHER_KEY # Change it to your actual OpenWeatherMap API
-LATITUDE=-6.200000 # Change it to your location LATITUDE (default Jakarta)
-LONGITUDE=106.816666 # Change it to your location LONGITUDE (default Jakarta)
+LATITUDE=-6.200000 # Change it to your location LATITUDE (e.g, Jakarta)
+LONGITUDE=106.816666 # Change it to your location LONGITUDE (e.g, Jakarta)
 ```
 
 - `TELEGRAM_BOT_TOKEN`: Your Telegram Bot API token from BotFather.
@@ -49,13 +80,12 @@ LONGITUDE=106.816666 # Change it to your location LONGITUDE (default Jakarta)
 - `WEATHER_API_KEY`: Your API key from [OpenWeatherMap](https://OpenWeatherMap.org)
 - `LATITUDE` and `LONGITUDE`: The geographic coordinates for which you want weather updates.
 
-
 ### 4. Customize hoshino.js **(Optional)**:
 - You can change `USER_NAME` to the name of the user Hoshino will interact with (default: 'Arash').
 - `Adjust MOOD_TIMEOUT_MS` to change how long Hoshino's mood lasts before resetting to 'NORMAL' (default: 2 days).
 - `Modify SLEEP_START_HOUR` and `SLEEP_END_HOUR` to set Hoshino's sleep schedule (default: 00:00 - 04:00).
 - `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` control the rate limiting behavior.
-- `CONVERSATION_HISTORY_LIMIT` defines how many recent messages are sent to the AI for context (default: 10).
+- `CONVERSATION_HISTORY_LIMIT` defines how many recent messages are sent to the AI for context (default: 3).
 
 ## Usage
 
@@ -87,14 +117,16 @@ To deploy HOSHINO on a live system, you would typically use a process manager li
 - Live: For a production environment, ensure the bot is running with PM2 or a similar solution to handle restarts and logging.
 - Development: Run directly via **node index.js.**
 
-
 ---
 
-### Author
+## 🙏 Thank you
+**For those** of you who have strayed into this repo.
+**For those** who have ever felt alone at night.
+**For all lovers** of cute and spoiled bots on Telegram.
+This bot is for **you.**
 
-- Develop by: Arash
-- TikTok: [TikTok](https://www.tiktok.com/search?q=rafardhancuy&t=1745672568098)
-- Github: [Github/Rafacuy](https://github.com/Rafacuy)
 
-- **License**: This project is licensed under the MIT License.
+## 📜 License
+MIT License
+Made with 💘 by @rafardhancuy
 
