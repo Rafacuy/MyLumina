@@ -1,5 +1,5 @@
 // hoshino.js
-// HOSHINO v3.0 (Updated)
+// HOSHINO v2.0 (Optimized)
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
@@ -52,6 +52,7 @@ const Mood = {
 let currentMood = Mood.NORMAL; // Hoshino's current mood
 let moodTimeoutId; // Stores the ID of the mood reset timeout
 let botInstance; // The Telegram Bot API instance
+let conversationHistory = []; // Stores the full conversation history for persistence
 let messageCache = new Map(); // Caches AI responses to avoid redundant API calls for identical prompts
 let userRequestCounts = new Map(); // Tracks request counts for rate limiting per user
 let isDeeptalkMode = false; // Flag to indicate if Hoshino is in deeptalk mode
@@ -208,6 +209,7 @@ const getWeatherData = async () => {
  * @returns {string} The system prompt string.
  */
 const getSystemPrompt = (isDeeptalkMode, currentMood) => {
+    // Get the current in-memory history from the memory module
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
 
     if (isDeeptalkMode) {
@@ -302,9 +304,9 @@ const generateAIResponse = async (prompt, requestChatId) => {
         if (response?.data?.choices?.length > 0 && response.data.choices[0].message?.content) {
             const aiResponse = response.data.choices[0].message.content;
 
+            // Update the global conversation history via memory module
             await memory.addMessage({ role: 'user', content: prompt });
             await memory.addMessage({ role: 'assistant', content: aiResponse });
-
 
             // Cache the AI response for a short duration (1 minute)
             messageCache.set(prompt, aiResponse);
@@ -361,7 +363,7 @@ const commandHandlers = [
         })
     },
     {
-        pattern: /(lagi apa|lagi ngapain)/i,
+        pattern: /(lagi apa|lagi ngapain|ngapain)/i,
         response: () => ({
             text: `Lagi mikirin ${USER_NAME} terus~ ${Mood.LOVING.emoji}`,
             mood: Mood.LOVING
@@ -369,14 +371,14 @@ const commandHandlers = [
     },
     // New Fast Mode Commands
     {
-        pattern: /(mood|suasana hati)/i,
+        pattern: /^(mood|suasana hati)/i,
         response: () => ({
             text: `Mood Hoshino saat ini sedang ${currentMood.name} ${currentMood.emoji}`,
             mood: currentMood // Keep current mood
         })
     },
     {
-        pattern: /(cuaca|info cuaca)/i,
+        pattern: /^(cuaca|info cuaca)/i,
         response: async (chatId) => {
             await hoshinoTyping(chatId);
             const weather = await getWeatherData();
@@ -394,17 +396,18 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /(lagu sedih|rekomendasi lagu sedih)/i,
-        response: (chatId) => {
-            sendSadSongNotification(chatId);
+        pattern: /^(lagu sedih|rekomendasi lagu sedih)/i,
+        response: async (chatId) => { // Make async because sendSadSongNotification is async
+            await sendSadSongNotification(chatId);
+            // No text response needed here, as sendSadSongNotification handles sending the message
             return {
-                text: `Semoga membantu ya ${USER_NAME}.. ${Mood.SAD.emoji}`, // Acknowledge sending the song
+                text: null, // Indicate that text is handled by sendSadSongNotification
                 mood: Mood.SAD
             };
         }
     },
     {
-        pattern: /(jam berapa|waktu sekarang)/i,
+        pattern: /^(jam berapa|waktu sekarang)/i,
         response: () => {
             const now = new Date();
             const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' };
@@ -428,11 +431,11 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /(sedih|galau|patah hati|nangis)/i,
-        response: () => {
-            const song = getRandomSadSong();
+        pattern: /(lagi sedih|lagi galau|patah hati|lagi nangis)/i,
+        response: async (chatId) => { // Make async
+            await sendSadSongNotification(chatId); // Call the function to send the song with preview
             return {
-                text: `Jangan sedih dong sayang~ Hoshino di sini buat kamu. Dengerin lagu ini aja yaa, semoga bisa sedikit menghibur:\n🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}\nPeluk jauh dari Hoshino ${Mood.LOVING.emoji}`,
+                text: `Jangan sedih dong sayang~ Hoshino di sini buat kamu. Peluk jauh dari Hoshino ${Mood.LOVING.emoji}`,
                 mood: Mood.SAD
             };
         }
@@ -464,7 +467,7 @@ function isOnlyNumbers(str) {
 const sadSongs = [
     {
         "title": "Car's Outside - James Arthur",
-        "url": "https://www.youtube.com/watch?v=g_Hn6_6sS5Y",
+        "url": "https://www.youtube.com/watch?v=7u8k9hFj9-c",
         "reason": "Lagu buat kamu yang udah nyampe tapi nggak bisa ketemu, karena keadaan nggak pernah berpihak."
     },
     {
@@ -474,32 +477,32 @@ const sadSongs = [
     },
     {
         "title": "Armada - Asal Kau Bahagia (Official Lyric Video)",
-        "url": "https://www.youtube.com/watch?v=0kF41E_2s10",
+        "url": "https://www.youtube.com/watch?v=e_wK6y0fEwQ",
         "reason": "Saat mencintai harus rela ngelepas, karena yang kamu cintai lebih bahagia tanpa kamu."
     },
     {
         "title": "Armada - Hargai Aku (Official Music Video)",
-        "url": "https://www.youtube.com/watch?v=W0yW5z7X02k",
+        "url": "https://www.youtube.com/watch?v=7h1L76z1MhM",
         "reason": "Tentang rasa lelah dicintai sepihak dan harapan kecil agar kamu dilihat dan dihargai."
     },
     {
         "title": "Impossible - James Arthur [Speed up] | (Lyrics & Terjemahan)",
-        "url": "https://www.youtube.com/watch?v=M9m4E0l0J6w",
+        "url": "https://www.youtube.com/watch?v=l_wQ2w7-v4M",
         "reason": "Cerita tentang cinta yang udah hancur, tapi sisa sakitnya tetap tinggal selamanya."
     },
     {
         "title": "Daun Jatuh - Resah Jadi Luka (Official Audio)",
-        "url": "https://www.youtube.com/watch?v=e_8-y_m_i_s",
+        "url": "https://www.youtube.com/watch?v=N_8qW3v-Pz8",
         "reason": "Ketika rasa resah nggak pernah reda, dan akhirnya berubah jadi luka yang dalam."
     },
     {
         "title": "Keisya Levronka - Tak Ingin Usai (Official Lyric Video)",
-        "url": "https://www.youtube.com/watch?v=s5e2kFv2S8w",
+        "url": "https://www.youtube.com/watch?v=b4w63s-4o_k",
         "reason": "Karena nggak semua pertemuan bisa selamanya, meski kamu nggak mau itu berakhir."
     },
     {
         "title": "VIONITA - DIA MASA LALUMU, AKU MASA DEPANMU (OFFICIAL MUSIC VIDEO)",
-        "url": "https://www.youtube.com/watch?v=yY2_e_g_k_0",
+        "url": "https://www.youtube.com/watch?v=G_M969o7M-k",
         "reason": "Untuk seseorang yang belum bisa lepas dari masa lalu, padahal masa depannya udah di depan mata."
     }
 ];
@@ -514,12 +517,51 @@ const getRandomSadSong = () => {
 };
 
 /**
- * Sends a random sad song notification.
+ * Extracts the YouTube video ID from a given YouTube URL.
+ * Supports standard watch URLs and short-form youtu.be URLs.
+ * @param {string} url The YouTube URL.
+ * @returns {string|null} The YouTube video ID, or null if not found.
+ */
+const getYouTubeVideoId = (url) => {
+    let videoId = null;
+    // Regex untuk mencocokkan ID video YouTube dari berbagai format URL
+    const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
+    const match = url.match(regExp);
+    if (match && match[1]) {
+        videoId = match[1];
+    }
+    return videoId;
+};
+
+/**
+ * Sends a random sad song notification, including a YouTube video preview (thumbnail).
+ * If sending the photo preview fails, it falls back to sending a text message with the URL.
  * @param {string|number} chatId The chat ID to send the notification to.
  */
-const sendSadSongNotification = (chatId) => {
+const sendSadSongNotification = async (chatId) => {
     const song = getRandomSadSong();
-    sendMessage(chatId, `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`);
+    const videoId = getYouTubeVideoId(song.url);
+
+    if (videoId) {
+        // Buat URL untuk thumbnail video YouTube (hqdefault adalah kualitas tinggi)
+        const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+        // Sertakan URL asli dalam caption agar pengguna bisa mengkliknya
+        const caption = `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`;
+
+        try {
+            // Gunakan botInstance.sendPhoto untuk mengirim thumbnail sebagai foto dengan caption
+            await botInstance.sendPhoto(chatId, thumbnailUrl, { caption: caption });
+            console.log(`Sent YouTube preview for "${song.title}" to chat ID: ${chatId}`);
+        } catch (error) {
+            console.error(`Error sending YouTube photo preview for "${song.title}" to chat ID ${chatId}:`, error.message);
+            // Fallback: Jika pengiriman foto gagal, kirim pesan teks biasa dengan URL
+            sendMessage(chatId, `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`);
+        }
+    } else {
+        // Jika ID video tidak dapat diekstrak, kirim pesan teks saja
+        console.warn(`Could not extract YouTube video ID from URL: ${song.url}. Sending text message only.`);
+        sendMessage(chatId, `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`);
+    }
 };
 
 /**
@@ -530,8 +572,8 @@ const cleanupCacheAndMemory = async () => {
     messageCache.clear(); // Clear the AI response cache
     console.log("Message cache cleared.");
 
-    await memory.save(); // Automatic system flush and rotate backup
-
+    // Trigger memory module's flush function to prune history and save to disk
+    await memory.save(); // `memory.save` is now mapped to `memory.flush`
 };
 
 /**
@@ -547,7 +589,7 @@ const updateTimeBasedModes = (chatId) => {
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
         isDeeptalkMode = true;
         setMood(chatId, Mood.CALM); // Set mood to CALM for deeptalk
-        sendMessage(chatId, `Sayang~ Sudah malam nih (${currentHour}:00). Ayo tidurr, hoshino temenin sampe bobo yaa..? ${Mood.CALM.emoji} Ada yang mau kamu ceritakan?`);
+        sendMessage(chatId, `Sayang~ Sudah malam nih (${currentHour}:00). Hoshino sekarang mode deeptalk yaa... ${Mood.CALM.emoji} Ada yang mau kamu ceritakan?`);
         console.log("Entered Deeptalk Mode.");
     }
     // Handle Deeptalk Mode deactivation (when hour is before DEEPTALK_START_HOUR and bot was in deeptalk mode)
@@ -570,13 +612,13 @@ const updateTimeBasedModes = (chatId) => {
         } else if (currentHour === 13) { // Noon (e.g., 1 PM)
             if (currentMood !== Mood.NORMAL) { // Only change if not already normal
                 setMood(chatId, Mood.NORMAL);
-                sendMessage(chatId, `Siang sayang~ Hoshino lagi santai nih.. Temenin dong~ ${Mood.NORMAL.emoji}`);
+                sendMessage(chatId, `Siang sayang~ Hoshino lagi santai nih. ${Mood.NORMAL.emoji}`);
             }
         } else if (currentHour === 17) { // Afternoon (e.g., 5 PM)
             const randomMood = getRandomMood();
             if (currentMood !== randomMood) {
                 setMood(chatId, randomMood);
-                sendMessage(chatId, `Sore sayang~ Hoshino lagi ngerasain ${randomMood.name} nihh ${randomMood.emoji}`);
+                sendMessage(chatId, `Sore sayang~ Hoshino lagi ngerasain ${randomMood.name} nih. ${randomMood.emoji}`);
             }
         }
     }
@@ -606,7 +648,8 @@ module.exports = (bot) => {
         const currentMessageChatId = chat.id;
 
         // Save the last chat message to memory
-        memory.saveLastChat(msg);
+        // This will now use the optimized memory.js's addMessage/saveLastChat
+        await memory.saveLastChat(msg);
 
         // Basic validation for incoming text messages
         if (!text || text.trim() === "") {
@@ -622,9 +665,13 @@ module.exports = (bot) => {
         for (const handler of commandHandlers) {
             if (handler.pattern.test(text)) {
                 // If a command is matched, get its predefined response and mood
-                const result = await handler.response(currentMessageChatId); // Pass chatId for async handlers
+                // Ensure response function is awaited as it might be async (e.g., weather, sad song)
+                const result = await handler.response(currentMessageChatId);
                 await hoshinoTyping(currentMessageChatId); // Show typing indicator
-                sendMessage(currentMessageChatId, result.text); // Send the predefined response
+                // Only send text message if result.text is defined (sendPhoto is handled inside sendSadSongNotification)
+                if (result.text) {
+                    sendMessage(currentMessageChatId, result.text);
+                }
                 if (result.mood) {
                     setMood(currentMessageChatId, result.mood); // Set Hoshino's mood
                 }
@@ -663,9 +710,9 @@ module.exports = (bot) => {
         });
 
         // Schedule sad song notification at 22:00 (10 PM) daily
-        schedule.scheduleJob({ rule: '0 22 * * *', tz: 'Asia/Jakarta' }, () => {
+        schedule.scheduleJob({ rule: '0 22 * * *', tz: 'Asia/Jakarta' }, async () => { // Make async
             console.log(`Sending sad song notification at 22:00 (Asia/Jakarta) to ${configuredChatId}`);
-            sendSadSongNotification(configuredChatId);
+            await sendSadSongNotification(configuredChatId); // Await the async function
         });
 
         // Schedule automatic cache and memory cleanup every 30 minutes
