@@ -1,5 +1,5 @@
 // hoshino.js
-// HOSHINO v2.0 (Optimized)
+// HOSHINO v3.0 (Updated)
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
@@ -369,14 +369,14 @@ const commandHandlers = [
     },
     // New Fast Mode Commands
     {
-        pattern: /^(mood|suasana hati)/i,
+        pattern: /(mood|suasana hati)/i,
         response: () => ({
             text: `Mood Hoshino saat ini sedang ${currentMood.name} ${currentMood.emoji}`,
             mood: currentMood // Keep current mood
         })
     },
     {
-        pattern: /^(cuaca|info cuaca)/i,
+        pattern: /(cuaca|info cuaca)/i,
         response: async (chatId) => {
             await hoshinoTyping(chatId);
             const weather = await getWeatherData();
@@ -394,7 +394,7 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /^(lagu sedih|rekomendasi lagu sedih)/i,
+        pattern: /(lagu sedih|rekomendasi lagu sedih)/i,
         response: (chatId) => {
             sendSadSongNotification(chatId);
             return {
@@ -404,7 +404,7 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /^(jam berapa|waktu sekarang)/i,
+        pattern: /(jam berapa|waktu sekarang)/i,
         response: () => {
             const now = new Date();
             const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' };
