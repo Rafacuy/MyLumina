@@ -3,8 +3,10 @@
 
 # 💖 HoshinoBot v3.0 – Memory of Love Edition
 
-> Telegram ChatBot smart, spoiled, and mature virtual girlfriend~
+> Telegram ChatBot smart, spoiled, and mature virtual girlfriend
+
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)
+
 > MIT License | Bahasa Indonesia 🇮🇩 | Full Offline-Compatible
 
 ---
@@ -128,5 +130,6 @@ This bot is for **you.**
 
 ## 📜 License
 MIT License
+
 Made with 💘 by @rafardhancuy
 
