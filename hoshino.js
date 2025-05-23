@@ -361,7 +361,7 @@ const commandHandlers = [
         })
     },
     {
-        pattern: /(lagi apa|lagi ngapain|ngapain)/i,
+        pattern: /(lagi apa|lagi ngapain)/i,
         response: () => ({
             text: `Lagi mikirin ${USER_NAME} terus~ ${Mood.LOVING.emoji}`,
             mood: Mood.LOVING
