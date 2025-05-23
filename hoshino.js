@@ -436,7 +436,7 @@ const commandHandlers = [
             await sendSadSongNotification(chatId); // Call the function to send the song with preview
             return {
                 text: `Jangan sedih dong sayang~ Hoshino di sini buat kamu. Peluk jauh dari Hoshino ${Mood.LOVING.emoji}`,
-                mood: Mood.SAD
+                mood: Mood.LOVING
             };
         }
     }
