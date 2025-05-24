@@ -243,6 +243,7 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
  * @returns {Promise<string>} A promise that resolves to the AI's generated response.
  */
 const generateAIResponse = async (prompt, requestChatId) => {    
+    const now = new Date()
     const currentHour = getJakartaHour();
 
     // Hoshino's sleep mode: If within sleep hours, return a sleep message
@@ -578,7 +579,7 @@ const cleanupCacheAndMemory = async () => {
  */
 const updateTimeBasedModes = (chatId) => {
     const now = new Date();
-    const currentHour = now.getHours();
+    const currentHour = getJakartaHour();
 
     // Handle Deeptalk Mode activation
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
