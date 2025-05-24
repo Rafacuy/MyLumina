@@ -243,7 +243,7 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
  * @returns {Promise<string>} A promise that resolves to the AI's generated response.
  */
 const generateAIResponse = async (prompt, requestChatId) => {    
-    const now = new Date()
+    const now = new Date();
     const currentHour = getJakartaHour();
 
     // Hoshino's sleep mode: If within sleep hours, return a sleep message
@@ -365,7 +365,7 @@ const commandHandlers = [
         })
     },
     {
-        pattern: /(lagi apa|lagi ngapain|ngapain)/i,
+        pattern: /(lagi apa|lagi ngapain)/i,
         response: () => ({
             text: `Lagi mikirin ${USER_NAME} terus~ ${Mood.LOVING.emoji}`,
             mood: Mood.LOVING
@@ -379,7 +379,7 @@ const commandHandlers = [
         })
     },
     {
-        pattern: /^(cuaca|info cuaca)/i,
+        pattern: /^(cuaca|info cuaca|cuaca hari ini)/i,
         response: async (chatId) => {
             await hoshinoTyping(chatId);
             const weather = await getWeatherData();
@@ -397,7 +397,7 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /^(lagu sedih|rekomendasi lagu sedih)/i,
+        pattern: /(lagu sedih|rekomendasi lagu sedih|rekomendasi lagu sad|lagu sad)/i,
         response: async (chatId) => { 
             await sendSadSongNotification(chatId);
             return {
@@ -407,7 +407,7 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /^(jam berapa|waktu sekarang)/i,
+        pattern: /(jam berapa|waktu sekarang)/i,
         response: () => {
             const now = new Date();
             const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' };
@@ -517,47 +517,12 @@ const getRandomSadSong = () => {
 };
 
 /**
- * Extracts the YouTube video ID from a given YouTube URL.
- * Supports standard watch URLs and short-form youtu.be URLs.
- * @param {string} url The YouTube URL.
- * @returns {string|null} The YouTube video ID, or null if not found.
- */
-const getYouTubeVideoId = (url) => {
-    let videoId = null;
-    const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
-    const match = url.match(regExp);
-    if (match && match[1]) {
-        videoId = match[1];
-    }
-    return videoId;
-};
-
-/**
- * Sends a random sad song notification, including a YouTube video preview (thumbnail).
- * If sending the photo preview fails, it falls back to sending a text message with the URL.
+ * Sends a random sad song notification.
  * @param {string|number} chatId The chat ID to send the notification to.
  */
 const sendSadSongNotification = async (chatId) => {
     const song = getRandomSadSong();
-    const videoId = getYouTubeVideoId(song.url);
-
-    if (videoId) {
-        const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        const caption = `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`;
-
-        try {
-            await botInstance.sendPhoto(chatId, thumbnailUrl, { caption: caption });
-            console.log(`Sent YouTube preview for "${song.title}" to chat ID: ${chatId}`);
-        } catch (error) {
-            console.error(`Error sending YouTube photo preview for "${song.title}" to chat ID ${chatId}:`, error.message);
-            // Fallback: Jika pengiriman foto gagal, kirim pesan teks biasa dengan URL
-            sendMessage(chatId, `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`);
-        }
-    } else {
-        // Jika ID video tidak dapat diekstrak, kirim pesan teks saja
-        console.warn(`Could not extract YouTube video ID from URL: ${song.url}. Sending text message only.`);
-        sendMessage(chatId, `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`);
-    }
+    sendMessage(chatId, `${song.url}🎶 Judul: ${song.title}${song.reason}\n`);
 };
 
 /**
@@ -694,7 +659,7 @@ module.exports = (bot) => {
 
         // Schedule periodic weather updates (every 3 hours)
         schedule.scheduleJob({ rule: '0 */5 * * *', tz: 'Asia/Jakarta' }, async () => {
-            console.log(`Fetching weather update (Asia/Jakarta) for chat ID: ${configuredChatId}`);
+            console.log(`Workspaceing weather update (Asia/Jakarta) for chat ID: ${configuredChatId}`);
             const weather = await getWeatherData(); // Fetch weather data
             if (weather) {
                 // If weather data is available, send formatted weather info and a reminder
