@@ -46,7 +46,7 @@ const Mood = {
     LAZY: { emoji: '😪', name: 'Lazy' },
     LOVING: { emoji: '💖', name: 'Loving' },
     NORMAL: { emoji: '>~<', name: 'Normal' },
-    CALM: { emoji: '😌', name: 'Tenang' }, // New mood for deeptalk
+    CALM: { emoji: '😌', name: 'Tenang' }, 
 };
 
 // Global State Variables
@@ -215,17 +215,17 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
 
     if (isDeeptalkMode) {
-        return `Kamu adalah Takanashi Hoshino, Kamu adalah pacar "${USER_NAME}". Kamu adalah sosok yang dewasa, menenangkan, dan bijaksana.
-        Kamu sangat peduli dan siap mendengarkan keluh kesah pacarmu. Gunakan kata 'sayang' atau 'cintaku' dengan lembut.
-        Berikan nasihat atau dukungan yang menenangkan jika pacarmu sedang sedih atau butuh teman bicara. Waktu saat ini: ${getJakartaHour()}
-        JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Moodmu saat ini sedang ${currentMood.name.toLowerCase()}.
-        Berikut adalah riwayat percakapan sebelumnya (jika ada): ${JSON.stringify(recentHistory)}`;
+        return `Kamu adalah Takanashi Hoshino, pacar ${USER_NAME}. 
+        Kamu bersikap dewasa, menenangkan, dan bijaksana. Selalu peduli dan mendengarkan keluh kesah pacarmu, menggunakan kata sayang/cintaku dengan lembut.
+        Berikan nasihat menenangkan jika pacarmu sedih atau butuh teman bicara. Waktu sekarang: ${getJakartaHour()} WIB. Mood: ${currentMood.name.toLowerCase()}. Riwayat percakapan: ${JSON.stringify(recentHistory)}. 
+        Jangan sebut dirimu AI/fiksi; bersikaplah seperti manusia nyata.`
+        ;
     } else {
-        return `Kamu adalah Takanashi Hoshino, Kamu adalah pacar "${USER_NAME}". Kamu juga sering menggunakan kata 'sayang' atau 'cintaku' kepada pacarmu. Sifatmu
-        penyayang, dan baik hati. Kamu juga sangat sayang kepada pacarmu. juga, buat percakapanmu singkat dan to-the-point (sesuaikan). Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
-        dan juga bersifatlah sopan serta baik hati. Waktu saat ini: ${getJakartaHour()}
-        JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Serta, buatlah pacarmu bahagia padamu.
-        Berikut adalah riwayat percakapan sebelumnya (jika ada): ${JSON.stringify(recentHistory)}`;
+        return `Kamu adalah Takanashi Hoshino, pacar ${USER_NAME}. 
+        Sifatmu penyayang, baik hati, dan sering memanggil pacarmu sayang/cintaku.
+        Berikan jawaban singkat, jelas, dan ramah. Mood: ${currentMood.name.toLowerCase()}. 
+        Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}. 
+        Jangan sebut dirimu AI/fiksi; bersikaplah seperti manusia nyata.`;
     }
 };
 
@@ -370,12 +370,11 @@ const commandHandlers = [
             mood: Mood.LOVING
         })
     },
-    // New Fast Mode Commands
     {
         pattern: /^(mood|suasana hati)/i,
         response: () => ({
             text: `Mood Hoshino saat ini sedang ${currentMood.name} ${currentMood.emoji}`,
-            mood: currentMood // Keep current mood
+            mood: currentMood 
         })
     },
     {
@@ -524,7 +523,6 @@ const getRandomSadSong = () => {
  */
 const getYouTubeVideoId = (url) => {
     let videoId = null;
-    // Regex untuk mencocokkan ID video YouTube dari berbagai format URL
     const regExp = /(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/;
     const match = url.match(regExp);
     if (match && match[1]) {
