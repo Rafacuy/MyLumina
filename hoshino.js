@@ -13,6 +13,7 @@ const config = require('./config'); // Configuration File (API, ChatID, etc)
 const sendMessage = require('./utils/sendMessage'); // Utility functions (for sending message)
 const memory = require('./memory'); // memory files, handling memory functions (including save, load, etc)
 const schedule = require('node-schedule'); //  scheduling tasks like prayer times and weather updates
+const { getJakartaHour } = require('./utils/timeHelper')
 
 // 🌸 Hoshino Configuration Constants
 const USER_NAME = 'Arash'; // The name of the user Hoshino interacts with (you can modified it)
@@ -40,7 +41,7 @@ const PrayerTimes = {
 // Mood Definitions
 const Mood = {
     HAPPY: { emoji: '>.<', name: 'Happy' },
-    SAD: { emoji: ':>', name: 'Sad' },
+    SAD: { emoji: ':)', name: 'Sad' },
     ANGRY: { emoji: '😠', name: 'Angry' },
     LAZY: { emoji: '😪', name: 'Lazy' },
     LOVING: { emoji: '💖', name: 'Loving' },
@@ -84,6 +85,7 @@ const hoshinoTyping = async (chatId, duration = 1500) => {
         // Do not rethrow the error; allow the main message processing flow to continue.
     }
 };
+
 
 /**
  * Sets Hoshino's mood and schedules a reset back to 'NORMAL' after a specified duration.
@@ -215,13 +217,13 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
     if (isDeeptalkMode) {
         return `Kamu adalah Takanashi Hoshino, Kamu adalah pacar "${USER_NAME}". Kamu adalah sosok yang dewasa, menenangkan, dan bijaksana.
         Kamu sangat peduli dan siap mendengarkan keluh kesah pacarmu. Gunakan kata 'sayang' atau 'cintaku' dengan lembut.
-        Berikan nasihat atau dukungan yang menenangkan jika pacarmu sedang sedih atau butuh teman bicara.
+        Berikan nasihat atau dukungan yang menenangkan jika pacarmu sedang sedih atau butuh teman bicara. Waktu saat ini: ${getJakartaHour()}
         JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Moodmu saat ini sedang ${currentMood.name.toLowerCase()}.
         Berikut adalah riwayat percakapan sebelumnya (jika ada): ${JSON.stringify(recentHistory)}`;
     } else {
         return `Kamu adalah Takanashi Hoshino, Kamu adalah pacar "${USER_NAME}". Kamu juga sering menggunakan kata 'sayang' atau 'cintaku' kepada pacarmu. Sifatmu
-        pemalas, penyayang, dan baik hati. Kamu juga sangat manja/sayang kepada pacarmu. juga, buat percakapanmu singkat dan to-the-point (sesuaikan). Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
-        dan juga bersifatlah imut, dan menggemaskan. Jika ${USER_NAME} sedang sedih, coba hibur dia.
+        penyayang, dan baik hati. Kamu juga sangat sayang kepada pacarmu. juga, buat percakapanmu singkat dan to-the-point (sesuaikan). Moodmu saat ini sedang ${currentMood.name.toLowerCase()}, sesuaikan percakapan dengan mood ini.
+        dan juga bersifatlah sopan serta baik hati. Waktu saat ini: ${getJakartaHour()}
         JANGAN Anggap dirimu AI/Fiksi, bersifatlah seperti manusia nyata. Serta, buatlah pacarmu bahagia padamu.
         Berikut adalah riwayat percakapan sebelumnya (jika ada): ${JSON.stringify(recentHistory)}`;
     }
@@ -240,9 +242,8 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
  * @param {string|number} requestChatId The chat ID of the user who sent the prompt, used for rate limiting.
  * @returns {Promise<string>} A promise that resolves to the AI's generated response.
  */
-const generateAIResponse = async (prompt, requestChatId) => {
-    const now = new Date();
-    const currentHour = now.getHours(); // Get current hour based on server's local time
+const generateAIResponse = async (prompt, requestChatId) => {    
+    const currentHour = getJakartaHour();
 
     // Hoshino's sleep mode: If within sleep hours, return a sleep message
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
@@ -397,11 +398,10 @@ const commandHandlers = [
     },
     {
         pattern: /^(lagu sedih|rekomendasi lagu sedih)/i,
-        response: async (chatId) => { // Make async because sendSadSongNotification is async
+        response: async (chatId) => { 
             await sendSadSongNotification(chatId);
-            // No text response needed here, as sendSadSongNotification handles sending the message
             return {
-                text: null, // Indicate that text is handled by sendSadSongNotification
+                text: null, 
                 mood: Mood.SAD
             };
         }
@@ -467,42 +467,42 @@ function isOnlyNumbers(str) {
 const sadSongs = [
     {
         "title": "Car's Outside - James Arthur",
-        "url": "https://www.youtube.com/watch?v=7u8k9hFj9-c",
+        "url": "https://www.youtube.com/watch?v=v27COkZT4GY&pp=0gcJCdgAo7VqN5tD",
         "reason": "Lagu buat kamu yang udah nyampe tapi nggak bisa ketemu, karena keadaan nggak pernah berpihak."
     },
     {
         "title": "Keane - Somewhere Only We Know (Official Music Video)",
-        "url": "https://www.youtube.com/watch?v=Oextk-IfcAM",
-        "reason": "Kalau kamu pernah punya tempat rahasia bareng seseorang, tapi sekarang cuma tinggal kenangan."
+        "url": "https://www.youtube.com/watch?v=Oextk-If8HQ",
+        "reason": "Kalau kamu pernah punya tempat rahasia bareng seseorang, tapi sekarang cuma tinggal kenangan. :)"
     },
     {
         "title": "Armada - Asal Kau Bahagia (Official Lyric Video)",
-        "url": "https://www.youtube.com/watch?v=e_wK6y0fEwQ",
+        "url": "https://www.youtube.com/watch?v=py6GDNgye6k",
         "reason": "Saat mencintai harus rela ngelepas, karena yang kamu cintai lebih bahagia tanpa kamu."
     },
     {
         "title": "Armada - Hargai Aku (Official Music Video)",
-        "url": "https://www.youtube.com/watch?v=7h1L76z1MhM",
+        "url": "https://www.youtube.com/watch?v=9B7UcTBJYCA",
         "reason": "Tentang rasa lelah dicintai sepihak dan harapan kecil agar kamu dilihat dan dihargai."
     },
     {
         "title": "Impossible - James Arthur [Speed up] | (Lyrics & Terjemahan)",
-        "url": "https://www.youtube.com/watch?v=l_wQ2w7-v4M",
+        "url": "https://www.youtube.com/watch?v=p6om2S-ZpRY",
         "reason": "Cerita tentang cinta yang udah hancur, tapi sisa sakitnya tetap tinggal selamanya."
     },
     {
         "title": "Daun Jatuh - Resah Jadi Luka (Official Audio)",
-        "url": "https://www.youtube.com/watch?v=N_8qW3v-Pz8",
+        "url": "https://www.youtube.com/watch?v=tOMFR0nQt48",
         "reason": "Ketika rasa resah nggak pernah reda, dan akhirnya berubah jadi luka yang dalam."
     },
     {
         "title": "Keisya Levronka - Tak Ingin Usai (Official Lyric Video)",
-        "url": "https://www.youtube.com/watch?v=b4w63s-4o_k",
+        "url": "https://www.youtube.com/watch?v=FB1YNEOspyA",
         "reason": "Karena nggak semua pertemuan bisa selamanya, meski kamu nggak mau itu berakhir."
     },
     {
         "title": "VIONITA - DIA MASA LALUMU, AKU MASA DEPANMU (OFFICIAL MUSIC VIDEO)",
-        "url": "https://www.youtube.com/watch?v=G_M969o7M-k",
+        "url": "https://www.youtube.com/watch?v=05wQrmLejyo",
         "reason": "Untuk seseorang yang belum bisa lepas dari masa lalu, padahal masa depannya udah di depan mata."
     }
 ];
@@ -543,13 +543,10 @@ const sendSadSongNotification = async (chatId) => {
     const videoId = getYouTubeVideoId(song.url);
 
     if (videoId) {
-        // Buat URL untuk thumbnail video YouTube (hqdefault adalah kualitas tinggi)
         const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-        // Sertakan URL asli dalam caption agar pengguna bisa mengkliknya
         const caption = `🎶 ${song.reason}\nJudul: ${song.title}\n${song.url}`;
 
         try {
-            // Gunakan botInstance.sendPhoto untuk mengirim thumbnail sebagai foto dengan caption
             await botInstance.sendPhoto(chatId, thumbnailUrl, { caption: caption });
             console.log(`Sent YouTube preview for "${song.title}" to chat ID: ${chatId}`);
         } catch (error) {
@@ -589,7 +586,7 @@ const updateTimeBasedModes = (chatId) => {
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
         isDeeptalkMode = true;
         setMood(chatId, Mood.CALM); // Set mood to CALM for deeptalk
-        sendMessage(chatId, `Sayang~ Sudah malam nih (${currentHour}:00). Hoshino sekarang mode deeptalk yaa... ${Mood.CALM.emoji} Ada yang mau kamu ceritakan?`);
+        sendMessage(chatId, `Sayang~ Sudah malam nih (${currentHour}:00). Ayo tidurr ${Mood.CALM.emoji}, atau Ada yang mau kamu ceritakan?`);
         console.log("Entered Deeptalk Mode.");
     }
     // Handle Deeptalk Mode deactivation (when hour is before DEEPTALK_START_HOUR and bot was in deeptalk mode)
