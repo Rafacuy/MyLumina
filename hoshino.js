@@ -522,7 +522,7 @@ const getRandomSadSong = () => {
  */
 const sendSadSongNotification = async (chatId) => {
     const song = getRandomSadSong();
-    sendMessage(chatId, `🎶 Judul: ${song.title}${song.reason}\n${song.url}`);
+    sendMessage(chatId, `🎶 Judul: ${song.title}\n${song.reason}\n${song.url}`);
 };
 
 /**
