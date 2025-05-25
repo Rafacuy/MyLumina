@@ -1,9 +1,9 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 💖 HoshinoBot v3.0 – Memory of Love Edition
+# 💖 HoshinoBot v4.0 – Productive Assistant
 
-> Telegram ChatBot smart, spoiled, and mature virtual girlfriend
+> Telegram ChatBot smart, and act as your assistant.
 
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)
 
@@ -11,14 +11,14 @@
 
 ---
 
-## ✨ What's New in v3.0?
+## ✨ What's New in v4.0?
 
-🔥 **Big Update "Memory of Love"**
 -  **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
 - 💾 **Ring Buffer + Archival**: History is automatically archived, without RAM being broken
 - ⏰ **Dynamic DeepTalk Mode**: Enter chat mode every 21.00 - 04.00
 - 📦 **Cache, Limit, Schedule, Backup**: All are optimal & save free VPS resources
-- 💬 **Automatic AI Context from `memory.js`**, no redundant state, no drama
+- **Optimized Memory**: Super OPTIMAL Memory modificarions.
+- **New Command!**: Added new command for hoshino-chatbot.
 
 ---
 
@@ -31,6 +31,7 @@
 - 🎭 Dynamic Mood System
 - ⏳ Auto Cache + Rate Limiter
 - 🧠 Custom Memory Layer (Fully Open Source)
+- Search Function (Using DDG)
 - 💌 Deep-Talk / Curhat Mode
 
 ---
@@ -123,9 +124,8 @@ To deploy HOSHINO on a live system, you would typically use a process manager li
 
 ## 🙏 Thank you
 **For those** of you who have strayed into this repo.
+
 **For those** who have ever felt alone at night.
-**For all lovers** of cute and spoiled bots on Telegram.
-This bot is for **you.**
 
 
 ## 📜 License
