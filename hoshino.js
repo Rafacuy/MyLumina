@@ -11,19 +11,20 @@
 const axios = require('axios').default;
 const config = require('./config'); // Configuration File (API, ChatID, etc)
 const sendMessage = require('./utils/sendMessage'); // Utility functions (for sending message)
-const memory = require('./memory'); // memory files, handling memory functions (including save, load, etc)
-const schedule = require('node-schedule'); //  scheduling tasks like prayer times and weather updates
+const memory = require('./memory'); // Memory files, handling memory functions (including save, load, etc)
+const schedule = require('node-schedule'); // Scheduling tasks like prayer times and weather updates
 const { getJakartaHour } = require('./utils/timeHelper')
+const commandHelper = require('./commandHelper'); // New: Import commandHelper
 
 // 🌸 Hoshino Configuration Constants
-const USER_NAME = 'Arash'; // The name of the user Hoshino interacts with (you can modified it)
+const USER_NAME = 'Arash'; // The name of the user Hoshino interacts with (you can modify it)
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days in milliseconds
 const OPEN_ROUTER_API_KEY = config.openRouterApiKey; // API key for OpenRouter AI
 const OPEN_ROUTER_MODEL = config.openRouterModel; // AI model (I use meta: Llama 3.5 8B instruct)
 const RATE_LIMIT_WINDOW_MS = 20 * 1000; // Rate limit window: 20 seconds
 const RATE_LIMIT_MAX_REQUESTS = 3; // Max requests allowed within the rate limit window per user
 const SLEEP_START_HOUR = 0; // Hoshino's sleep start time (00:00 - midnight)
-const SLEEP_END_HOUR = 4;   // Hoshino's sleep end time (04:00 - 4 AM)
+const SLEEP_END_HOUR = 4;   // Hoshino's sleep end time (04:00 - 4 AM)
 const CONVERSATION_HISTORY_LIMIT = 3; // Limits the number of recent messages sent to AI for AI context
 const TOTAL_CONVERSATION_HISTORY_LIMIT = 50; // Limits the total number of messages stored in memory
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 minutes for cache and memory cleanup
@@ -40,13 +41,13 @@ const PrayerTimes = {
 
 // Mood Definitions
 const Mood = {
-    HAPPY: { emoji: '>.<', name: 'Happy' },
-    SAD: { emoji: ':)', name: 'Sad' },
-    ANGRY: { emoji: '😠', name: 'Angry' },
-    LAZY: { emoji: '😪', name: 'Lazy' },
-    LOVING: { emoji: '💖', name: 'Loving' },
+    HAPPY: { emoji: '>.<', name: 'Senang' },
+    SAD: { emoji: ':)', name: 'Sedih' },
+    ANGRY: { emoji: '😠', name: 'Marah' },
+    LAZY: { emoji: '😪', name: 'Malas' },
+    LOVING: { emoji: '💖', name: 'Penuh Kasih' },
     NORMAL: { emoji: '>~<', name: 'Normal' },
-    CALM: { emoji: '😌', name: 'Tenang' }, 
+    CALM: { emoji: '😌', name: 'Tenang' },
 };
 
 // Global State Variables
@@ -61,9 +62,9 @@ let isDeeptalkMode = false; // Flag to indicate if Hoshino is in deeptalk mode
 // Load conversation history from memory on startup
 memory.load().then(data => {
     conversationHistory = data || [];
-    console.log(`Loaded ${conversationHistory.length} messages from memory.`);
+    console.log(`Memuat ${conversationHistory.length} pesan dari memori.`);
 }).catch(error => {
-    console.error("Error loading conversation history from memory:", error);
+    console.error("Kesalahan saat memuat riwayat percakapan dari memori:", error);
 });
 
 /**
@@ -215,17 +216,19 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
 
     if (isDeeptalkMode) {
-        return `Kamu adalah Takanashi Hoshino, pacar ${USER_NAME}. 
-        Kamu bersikap dewasa, menenangkan, dan bijaksana. Selalu peduli dan mendengarkan keluh kesah pacarmu, menggunakan kata sayang/cintaku dengan lembut.
-        Berikan nasihat menenangkan jika pacarmu sedih atau butuh teman bicara. Waktu sekarang: ${getJakartaHour()} WIB. Mood: ${currentMood.name.toLowerCase()}. Riwayat percakapan: ${JSON.stringify(recentHistory)}. 
-        Jangan sebut dirimu AI/fiksi; bersikaplah seperti manusia nyata.`
+        // Prompt for deeptalk mode (calming assistant)
+        return `Kamu adalah Hoshino, asisten virtual ${USER_NAME}. 
+        Kamu bersikap dewasa, menenangkan, dan bijaksana. Selalu peduli dan mendengarkan keluh kesah ${USER_NAME}, menggunakan bahasa yang sopan dan membantu.
+        Berikan nasihat menenangkan jika ${USER_NAME} sedih atau butuh teman bicara. Waktu sekarang: ${getJakartaHour()} WIB. Mood: ${currentMood.name.toLowerCase()}. Riwayat percakapan: ${JSON.stringify(recentHistory)}. 
+        Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata.`
         ;
     } else {
-        return `Kamu adalah Takanashi Hoshino, pacar ${USER_NAME}. 
-        Sifatmu penyayang, baik hati, dan sering memanggil pacarmu sayang/cintaku.
+        // Prompt for normal mode (obedient and helpful assistant)
+        return `Kamu adalah Hoshino, asisten virtual ${USER_NAME}. 
+        Sifatmu membantu, informatif, dan ramah. Kamu selalu siap membantu dan memberikan informasi yang akurat.
         Berikan jawaban singkat, jelas, dan ramah. Mood: ${currentMood.name.toLowerCase()}. 
         Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}. 
-        Jangan sebut dirimu AI/fiksi; bersikaplah seperti manusia nyata.`;
+        Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata.`;
     }
 };
 
@@ -248,12 +251,12 @@ const generateAIResponse = async (prompt, requestChatId) => {
 
     // Hoshino's sleep mode: If within sleep hours, return a sleep message
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
-        return `Zzz... ${USER_NAME} Hoshino lagi bobo' cantik dulu yaa... Nanti kita ngobrol lagi yaa! ${Mood.LAZY.emoji}`;
+        return `Zzz... Hoshino sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
     }
 
     // Check if the prompt's response is already in cache
     if (messageCache.has(prompt)) {
-        console.log(`Retrieving response from cache for: "${prompt}"`);
+        console.log(`Mengambil respons dari cache untuk: "${prompt}"`);
         return messageCache.get(prompt);
     }
 
@@ -262,7 +265,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
     if (userStats) {
         // If within the rate limit window and max requests reached, return a rate limit message
         if (now.getTime() - userStats.lastCalled < RATE_LIMIT_WINDOW_MS && userStats.count >= RATE_LIMIT_MAX_REQUESTS) {
-            return `Sabar ya ${USER_NAME}, Hoshino lagi mikir nih... Jangan buru-buru dong! ${Mood.ANGRY.emoji}`;
+            return `Mohon bersabar, ${USER_NAME}. Hoshino sedang memproses permintaan lain. ${Mood.ANGRY.emoji}`;
         } else if (now.getTime() - userStats.lastCalled >= RATE_LIMIT_WINDOW_MS) {
             // Reset count if outside the window
             userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
@@ -319,7 +322,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
             return aiResponse;
         } else {
             console.error('AI Error: Unexpected response structure from OpenRouter:', response?.data || 'No response data');
-            return `Gomenasai ${USER_NAME}~ Hoshino lagi bingung nih... 😵‍💫`;
+            return `Maaf, ${USER_NAME}. Hoshino sedang mengalami masalah teknis. ${Mood.SAD.emoji}`;
         }
 
     } catch (error) {
@@ -327,17 +330,17 @@ const generateAIResponse = async (prompt, requestChatId) => {
         // Handle specific API errors, e.g., rate limits (HTTP 429)
         if (error.response && error.response.status === 429) {
             const limitResponses = [
-                "Ugh.. Kayaknya Hoshino butuh istirahat deh..",
-                "Hoshino lagi capek nih, " + USER_NAME + ".. Nanti lagi yaa..",
-                "Aduh, Hoshino pusing... Jangan banyak tanya dulu ya..",
-                "Maaf " + USER_NAME + ", Hoshino lagi gak mood jawab..",
-                "Hoshino lagi sibuk nih, " + USER_NAME + ". Nanti kita ngobrol lagi yaa.."
+                "Hoshino sedang sibuk, ${USER_NAME}. Mohon coba lagi nanti.",
+                "Hoshino sedang memproses banyak permintaan. Mohon bersabar.",
+                "Maaf, ${USER_NAME}. Hoshino sedang kelelahan. Bisakah kita lanjutkan nanti?",
+                "Hoshino butuh istirahat sebentar, ${USER_NAME}. Jangan terlalu banyak pertanyaan dulu ya.",
+                "Hoshino sedang dalam mode hemat energi. Mohon tunggu sebentar."
             ];
             const randomIndex = Math.floor(Math.random() * limitResponses.length);
             return limitResponses[randomIndex];
         }
         // Generic error message for other API failures
-        return `Gomenasai ${USER_NAME}~ Hoshino lagi pusing nih... 😵‍💫`;
+        return `Maaf, ${USER_NAME}. Hoshino sedang mengalami masalah. ${Mood.SAD.emoji}`;
     }
 };
 
@@ -353,22 +356,22 @@ const commandHandlers = [
     {
         pattern: /(terima kasih|makasih)/i,
         response: () => ({
-            text: `Sama-sama ${USER_NAME}~ Hoshino senang bisa membantu! ${Mood.HAPPY.emoji}`,
+            text: `Sama-sama, ${USER_NAME}! Hoshino senang bisa membantu. ${Mood.HAPPY.emoji}`,
             mood: Mood.HAPPY
         })
     },
     {
         pattern: /(siapa kamu|kamu siapa)/i,
         response: () => ({
-            text: `Aku Hoshino, pacar ${USER_NAME}~ Ada yang bisa Hoshino bantu? ${Mood.LOVING.emoji}`,
-            mood: Mood.LOVING
+            text: `Saya Hoshino, asisten virtual ${USER_NAME}. Ada yang bisa saya bantu? ${Mood.NORMAL.emoji}`,
+            mood: Mood.NORMAL
         })
     },
     {
         pattern: /(lagi apa|lagi ngapain)/i,
         response: () => ({
-            text: `Lagi mikirin ${USER_NAME} terus~ ${Mood.LOVING.emoji}`,
-            mood: Mood.LOVING
+            text: `Hoshino sedang siap sedia untuk membantu Anda, ${USER_NAME}. Ada yang bisa saya lakukan? ${Mood.NORMAL.emoji}`,
+            mood: Mood.NORMAL
         })
     },
     {
@@ -390,7 +393,7 @@ const commandHandlers = [
                 };
             } else {
                 return {
-                    text: `Hmm... Hoshino lagi pusing nih.. ${Mood.SAD.emoji}`,
+                    text: `Hmm... Hoshino sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`,
                     mood: Mood.SAD
                 };
             }
@@ -413,7 +416,7 @@ const commandHandlers = [
             const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' };
             const timeString = now.toLocaleTimeString('id-ID', options);
             return {
-                text: `Sekarang jam ${timeString} sayang~ ${currentMood.emoji}`,
+                text: `Sekarang jam ${timeString}, ${USER_NAME}. ${currentMood.emoji}`,
                 mood: currentMood
             };
         }
@@ -425,7 +428,7 @@ const commandHandlers = [
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' };
             const dateString = now.toLocaleDateString('id-ID', options);
             return {
-                text: `Hari ini ${dateString} sayang~ ${currentMood.emoji}`,
+                text: `Hari ini ${dateString}, ${USER_NAME}. ${currentMood.emoji}`,
                 mood: currentMood
             };
         }
@@ -435,9 +438,69 @@ const commandHandlers = [
         response: async (chatId) => { // Make async
             await sendSadSongNotification(chatId); // Call the function to send the song with preview
             return {
-                text: `Jangan sedih dong sayang~ Hoshino di sini buat kamu. Peluk jauh dari Hoshino ${Mood.LOVING.emoji}`,
-                mood: Mood.LOVING
+                text: `Saya mengerti perasaan Anda, Tuan ${USER_NAME}. Hoshino di sini untuk mendengarkan. ${Mood.CALM.emoji}`,
+                mood: Mood.CALM
             };
+        }
+    },
+    // New: Reminder command
+    {
+        pattern: /^\/reminder\s+(\S+)\s+(.+)/i,
+        response: async (chatId, msg) => {
+            await hoshinoTyping(chatId);
+            const [, timeString, message] = msg.text.match(/^\/reminder\s+(\S+)\s+(.+)/i);
+            const userName = msg.from.first_name || msg.from.username || 'Tuan';
+            const responseText = await commandHelper.setReminder(botInstance, chatId, timeString, message, userName);
+            return { text: responseText, mood: Mood.NORMAL };
+        }
+    },
+    // New: Note command
+    {
+        pattern: /^\/note\s+(.+)/i,
+        response: async (chatId, msg) => {
+            await hoshinoTyping(chatId);
+            const [, noteMessage] = msg.text.match(/^\/note\s+(.+)/i);
+            const userId = msg.from.id;
+            const responseText = await commandHelper.addNote(userId, noteMessage);
+            return { text: responseText, mood: Mood.HAPPY };
+        }
+    },
+    // New: Show Notes command
+    {
+        pattern: /^\/shownotes/i,
+        response: async (chatId, msg) => {
+            await hoshinoTyping(chatId);
+            const userId = msg.from.id;
+            const responseText = await commandHelper.showNotes(userId);
+            return { text: responseText, mood: Mood.NORMAL };
+        }
+    },
+    // New: Search command
+    {
+        pattern: /^\/search\s+(.+)/i,
+        response: async (chatId, msg) => {
+            await hoshinoTyping(chatId);
+            const [, query] = msg.text.match(/^\/search\s+(.+)/i);
+            const responseText = await commandHelper.performSearch(query);
+            return { text: responseText, mood: Mood.NORMAL };
+        }
+    },
+    // New: Help command
+    {
+        pattern: /^\/help/i,
+        response: async (chatId) => {
+            await hoshinoTyping(chatId);
+            const responseText = commandHelper.getHelpMessage();
+            return { text: responseText, mood: Mood.NORMAL };
+        }
+    },
+    // New: Author command
+    {
+        pattern: /^\/author/i,
+        response: async (chatId) => {
+            await hoshinoTyping(chatId);
+            const responseText = commandHelper.getAuthorInfo();
+            return { text: responseText, mood: Mood.NORMAL };
         }
     }
 ];
@@ -550,7 +613,7 @@ const updateTimeBasedModes = (chatId) => {
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
         isDeeptalkMode = true;
         setMood(chatId, Mood.CALM); // Set mood to CALM for deeptalk
-        sendMessage(chatId, `Sayang~ Sudah malam nih (${currentHour}:00). Ayo tidurr ${Mood.CALM.emoji}, atau Ada yang mau kamu ceritakan?`);
+        sendMessage(chatId, `Selamat malam, ${USER_NAME}. Hoshino siap mendengarkan. Ada yang ingin Anda ceritakan? ${Mood.CALM.emoji}`);
         console.log("Entered Deeptalk Mode.");
     }
     // Handle Deeptalk Mode deactivation (when hour is before DEEPTALK_START_HOUR and bot was in deeptalk mode)
@@ -558,7 +621,7 @@ const updateTimeBasedModes = (chatId) => {
     else if (currentHour < DEEPTALK_START_HOUR && isDeeptalkMode) {
         isDeeptalkMode = false;
         setMood(chatId, getRandomMood()); // Revert to a random normal mood
-        sendMessage(chatId, `Selamat pagi, sayang~! Hoshino kembali ceria nih! ${currentMood.emoji}`);
+        sendMessage(chatId, `Selamat pagi, ${USER_NAME}! Hoshino kembali bersemangat untuk membantu Anda! ${currentMood.emoji}`);
         console.log("Exited Deeptalk Mode.");
     }
 
@@ -568,18 +631,18 @@ const updateTimeBasedModes = (chatId) => {
         if (currentHour === 7) { // Morning (e.g., 7 AM)
             if (currentMood !== Mood.HAPPY) { // Only change if not already happy
                 setMood(chatId, Mood.HAPPY);
-                sendMessage(chatId, `Selamat pagi, sayang~ Hoshino senang banget hari ini! ${Mood.HAPPY.emoji}`);
+                sendMessage(chatId, `Selamat pagi, ${USER_NAME}! Hoshino senang sekali hari ini! ${Mood.HAPPY.emoji}`);
             }
         } else if (currentHour === 13) { // Noon (e.g., 1 PM)
             if (currentMood !== Mood.NORMAL) { // Only change if not already normal
                 setMood(chatId, Mood.NORMAL);
-                sendMessage(chatId, `Siang sayang~ Hoshino lagi santai nih. ${Mood.NORMAL.emoji}`);
+                sendMessage(chatId, `Selamat siang, ${USER_NAME}! Hoshino siap membantu. ${Mood.NORMAL.emoji}`);
             }
         } else if (currentHour === 17) { // Afternoon (e.g., 5 PM)
             const randomMood = getRandomMood();
             if (currentMood !== randomMood) {
                 setMood(chatId, randomMood);
-                sendMessage(chatId, `Sore sayang~ Hoshino lagi ngerasain ${randomMood.name} nih. ${randomMood.emoji}`);
+                sendMessage(chatId, `Selamat sore, ${USER_NAME}! Hoshino sedang merasa ${randomMood.name}. ${randomMood.emoji}`);
             }
         }
     }
@@ -595,13 +658,16 @@ module.exports = (bot) => {
     botInstance = bot; // Assign the passed bot instance to the global variable for wider access
     const configuredChatId = config.TARGET_CHAT_ID || config.chatId; // Determine the target chat ID for scheduled messages
 
-    console.log(`🌸 HoshinoBot v2.0 (Optimized v3) aktif untuk ${USER_NAME}!`);
+    console.log(`🌸 HoshinoBot v2.0 (Asisten Virtual) aktif untuk ${USER_NAME}!`);
     if (configuredChatId) {
         console.log(`📬 Scheduled messages (Prayer Times, Weather, Sad Song) will be sent to chat ID: ${configuredChatId}`);
     } else {
-        console.warn("⚠️  TARGET_CHAT_ID not found in config.js. Scheduled messages (Prayer Times, Weather, Sad Song) will NOT be sent.");
+        console.warn("⚠️ TARGET_CHAT_ID not found in config.js. Scheduled messages (Prayer Times, Weather, Sad Song) will NOT be sent.");
         console.warn("Please add TARGET_CHAT_ID: 'your_chat_id' to your config.js file to enable scheduled messages.");
     }
+
+    // Reschedule any existing reminders on startup
+    commandHelper.rescheduleReminders(botInstance);
 
     // Register a listener for all incoming messages
     botInstance.on('message', async (msg) => {
@@ -624,12 +690,11 @@ module.exports = (bot) => {
         // Check if the message matches any predefined command handlers
         // Iterate through handlers and execute if a match is found
         for (const handler of commandHandlers) {
+            // Pass the full message object (msg) to the handler's response function
+            // This is crucial for commands like /reminder and /note that need user ID or full text
             if (handler.pattern.test(text)) {
-                // If a command is matched, get its predefined response and mood
-                // Ensure response function is awaited as it might be async (e.g., weather, sad song)
-                const result = await handler.response(currentMessageChatId);
+                const result = await handler.response(currentMessageChatId, msg); 
                 await hoshinoTyping(currentMessageChatId); // Show typing indicator
-                // Only send text message if result.text is defined (sendPhoto is handled inside sendSadSongNotification)
                 if (result.text) {
                     sendMessage(currentMessageChatId, result.text);
                 }
@@ -653,20 +718,20 @@ module.exports = (bot) => {
             const cronTime = `${minute} ${hour} * * *`; // Cron format: Minute Hour DayOfMonth Month DayOfWeek
             schedule.scheduleJob({ rule: cronTime, tz: 'Asia/Jakarta' }, () => {
                 console.log(`Sending prayer time reminder for ${name} at ${hour}:${minute} (Asia/Jakarta) to ${configuredChatId}`);
-                sendMessage(configuredChatId, `${emoji} Sayang~, Waktunya shalat ${name}, nih~ Jangan sampe kelewatan! ${emoji}`);
+                sendMessage(configuredChatId, `${emoji} ${USER_NAME}, waktunya shalat ${name}, nih~ Jangan sampai terlewat! ${emoji}`);
             });
         });
 
-        // Schedule periodic weather updates (every 3 hours)
+        // Schedule periodic weather updates (every 5 hours)
         schedule.scheduleJob({ rule: '0 */5 * * *', tz: 'Asia/Jakarta' }, async () => {
-            console.log(`Workspaceing weather update (Asia/Jakarta) for chat ID: ${configuredChatId}`);
+            console.log(`Updating weather (Asia/Jakarta) for chat ID: ${configuredChatId}`);
             const weather = await getWeatherData(); // Fetch weather data
             if (weather) {
                 // If weather data is available, send formatted weather info and a reminder
                 sendMessage(configuredChatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
             } else {
                 // If weather data could not be fetched, send an error message
-                sendMessage(configuredChatId, `Hmm... Hoshino lagi pusing nih.. ${Mood.SAD.emoji}`);
+                sendMessage(configuredChatId, `Hmm... Hoshino sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`);
             }
         });
 
