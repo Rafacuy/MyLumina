@@ -6,6 +6,7 @@ const axios = require('axios'); // Untuk membuat permintaan HTTP ke API
 const config = require('../config/config'); // File konfigurasi untuk kunci API dan pengaturan lainnya
 const sendMessage = require('./sendMessage'); // Utilitas untuk mengirim pesan
 const { formatJakartaDateTime, formatJakartaTime } = require('./timeHelper'); // Utilitas untuk mendapatkan waktu Jakarta
+const moment = require('moment-timezone')
 
 const REMINDERS_FILE = './data/reminders.json'; // Path ke file JSON pengingat
 const NOTES_FILE = './data/notes.json'; // Path ke file JSON catatan
@@ -59,7 +60,7 @@ const saveReminders = async (reminders) => {
  * @returns {Promise<string>} Pesan yang menunjukkan keberhasilan atau kegagalan penjadwalan.
  */
 const setReminder = async (botInstance, chatId, timeString, message, userName) => {
-    const now = new Date();
+    const now = moment().tz('Asia/Jakarta');
     let reminderTime;
 
     // Parsing waktu dasar (dapat diperluas untuk input yang lebih kompleks)
@@ -123,7 +124,7 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
  */
 const rescheduleReminders = async (botInstance) => {
     const reminders = await loadReminders();
-    const now = new Date();
+    const now = moment().tz('Asia/Jakarta');
 
     const activeReminders = [];
     for (const reminder of reminders) {
