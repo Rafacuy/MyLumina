@@ -2,7 +2,7 @@
 
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const config = require('./config');
+const config = require('./config/config');
 const hoshinoInteraction = require('./hoshino');
 
 const bot = new TelegramBot(config.telegramBotToken, { polling: true });
