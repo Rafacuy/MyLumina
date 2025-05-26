@@ -1,56 +1,50 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 💖 HoshinoBot v4.0 – Productive Assistant
+# 🌸 HoshinoBot v4.0 – Productive Assistant
 
-> Telegram ChatBot smart, and act as your assistant.
-
-> Built with love, by [@rafardhancuy](https://github.com/rafacuy)
-
+> Telegram ChatBot smart, and act as your assistant.  
+> Built with love, by [@rafardhancuy](https://github.com/rafacuy)  
 > MIT License | Bahasa Indonesia 🇮🇩 | Full Offline-Compatible
 
 ---
 
 ## ✨ What's New in v4.0?
 
--  **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
-- 💾 **Ring Buffer + Archival**: History is automatically archived, without RAM being broken
-- ⏰ **Dynamic DeepTalk Mode**: Enter chat mode every 21.00 - 04.00
-- 📦 **Cache, Limit, Schedule, Backup**: All are optimal & save free VPS resources
-- **Optimized Memory**: Super OPTIMAL Memory modificarions.
-- **New Command!**: Added new command for hoshino-chatbot.
+- 🧠 **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
+- 💾 **Ring Buffer + Archival**: History auto-archive, no RAM overload
+- 🌙 **Dynamic DeepTalk Mode**: Curhat mode active between 21:00 - 04:00
+- 📦 **Cache, Limit, Schedule, Backup**: Optimize VPS usage & resources
+- 💬 **Custom Command Additions**: More interactive commands (reminder, note, search)
+- 🌐 **Improved Web Search**: Now supports Google Custom Search with your API key
 
 ---
 
-##  Main Features
+## 🔥 Main Features
 
-- 💬 AI ChatBot with OpenRouter (Meta, Claude, etc)
--  Weather Info & Weather Reminder
-- 🙏 Automatic Prayer Schedule
-- 🎶 Sad Song Recommendations
-- 🎭 Dynamic Mood System
-- ⏳ Auto Cache + Rate Limiter
-- 🧠 Custom Memory Layer (Fully Open Source)
-- Search Function (Using DDG)
-- 💌 Deep-Talk / Curhat Mode
+- 💬 AI ChatBot with OpenRouter (LLaMA, Claude, etc)
+- 🌦️ Weather Info & Personalized Weather Reminders
+- 🙏 Automatic Prayer Schedule (Asia/Jakarta)
+- 🎶 Sad Song Recommendations at Night
+- 🎭 Dynamic Mood System (with rate limit and mood reset)
+- ⏳ Auto Cache Cleanup & Memory Flush
+- 📝 Personal Notes & Reminders
+- 🔍 Web Search with Google Custom Search
+- 💌 DeepTalk Mode (Deeptalk/calm conversation)
 
 ---
 
-## Getting Started
+## 🚀 Getting Started
 
-These instructions will guide you through setting up and running HOSHINO on your local machine for development and testing.
+### Prerequisites
+- **Node.js** (>= 18)
+- **Telegram Bot Token** from [@BotFather](https://t.me/BotFather)
+- **OpenRouter API Key** from [OpenRouter](https://OpenRouter.ai)
+- **OpenWeatherMap API Key** from [OpenWeatherMap](https://openweathermap.org)
+- **Google Custom Search API Key & CSE ID** (Optional)
+- **Your Telegram Chat ID** for scheduled messages
 
-## Prerequisites
-
-Before you begin, ensure you have the following:
-
-- **Node.js**: The bot is built with Node.js. Make sure you have it installed on your system.
-- **Telegram Bot Token**: You'll need to create a new bot via BotFather on Telegram to obtain your unique API token.
-- **OpenRouter API Key**: Hoshino uses OpenRouter for its AI capabilities. You'll need an API key from [OpenRouter](https://OpenRouter.ai)
-- **OpenWeatherMap API Key**: For weather updates, Hoshino integrates with OpenWeatherMap. Obtain an API key from [OpenWeatherMap](https://OpenWeatherMap.org)
-- **Your Telegram Chat ID**: This is required for Hoshino to send scheduled messages (prayer times, weather updates) to a specific chat.
-
-## Installation
+### Installation
 
 Follow these steps to get your HOSHINO bot up and running:
 
@@ -67,13 +61,15 @@ npm install
 Example:
 
 ```bash
-TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_TOKEN # Change it to your actual telegram bot token
-OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY # Change it to your actual OpenRouter API key
-OPENROUTER_MODEL=meta-llama/llama-3.3-8b-instruct:free # Change it to model that you want to use
-TARGET_CHAT_ID=YOUR_CHAT_ID # Change it to your ChatID
-WEATHER_API_KEY=YOUR_WEATHER_KEY # Change it to your actual OpenWeatherMap API
+TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_TOKEN # Replace it to your actual Telegram Bot Token
+OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY # Replace it to your OpenRouter API key
+OPENROUTER_MODEL=meta-llama/llama-3.5-8b-instruct # (Optional) Change it to model that you want
+WEATHER_API_KEY=YOUR_OPENWEATHERMAP_KEY # Replace it to your actual OpenWeather API Key
 LATITUDE=-6.200000 # Change it to your location LATITUDE (e.g, Jakarta)
-LONGITUDE=106.816666 # Change it to your location LONGITUDE (e.g, Jakarta)
+LONGITUDE=106.816666 # Change it to your location LONGITUDE (e.g, jakarta)
+TARGET_CHAT_ID=YOUR_CHAT_ID # Your Chat ID
+GOOGLE_SEARCH_API_KEY=YOUR_GOOGLE_KEY # Your google search API KEY
+GOOGLE_SEARCH_CX=YOUR_CSE_ID # Your google search CSEID
 ```
 
 - `TELEGRAM_BOT_TOKEN`: Your Telegram Bot API token from BotFather.
@@ -82,6 +78,8 @@ LONGITUDE=106.816666 # Change it to your location LONGITUDE (e.g, Jakarta)
 - `TARGET_CHAT_ID`: The chat ID where Hoshino will send scheduled messages like prayer times and weather updates
 - `WEATHER_API_KEY`: Your API key from [OpenWeatherMap](https://OpenWeatherMap.org)
 - `LATITUDE` and `LONGITUDE`: The geographic coordinates for which you want weather updates.
+- `GOOGLE_SEARCH_API_KEY`: Your API Key from [GoogleCustomSearch](https://developers.google.com/custom-search/v1/overview)
+- `GOOGLE_SEARCH_CX`: Your API Key from [GoogleCustomSearchEngine](https://developers.google.com/custom-search/v1/overview)
 
 ### 4. Customize hoshino.js **(Optional)**:
 - You can change `USER_NAME` to the name of the user Hoshino will interact with (default: 'Arash').
@@ -105,11 +103,17 @@ node index.js
     - `terima kasih, makasih`: Hoshino will express happiness to have helped.
     - `siapa kamu, kamu siapa`: Hoshino will introduce herself as your girlfriend.
     - `lagi apa, lagi ngapain, ngapain`: Hoshino will give a loving response about thinking of you.
+    - /reminder HH:MM (Message): Set reminder.
+    - /note pesan: Save notes.
+    - /shownotes: Show personal notes.
+    - /search query: Search for info on Google.
+    - /help: Show lists of commands.
+    - /author: Information about creators.
 
 - **Scheduled Messages**: If `TARGET_CHAT_ID` is configured, Hoshino will automatically send:
     - Daily prayer time reminders for Subuh, Dzuhur, Ashar, Maghrib, and Isya (Asia/Jakarta timezone).
-    - Periodic weather updates and personalized weather-based reminders (every 3 hours).   
-
+    - Periodic weather updates and personalized weather-based reminders (every 5 hours).   
+    - Sad song recomendations every 10 PM.
 
 ## Deployment
 
@@ -120,16 +124,45 @@ To deploy HOSHINO on a live system, you would typically use a process manager li
 - Live: For a production environment, ensure the bot is running with PM2 or a similar solution to handle restarts and logging.
 - Development: Run directly via **node index.js.**
 
----
+
+## 📂 Directory Structure
+```bash
+hoshino-chatbot/
+├── config/
+│   └── config.js          # Manual config (if not using .env)
+├── utils/
+│   ├── sendMessage.js     # Telegram message sending
+│   ├── timeHelper.js      # Jakarta time format
+│   └── commandHelper.js   # Reminder, Note, Search
+├── data/
+│   ├── reminders.json     # Reminder storage
+│   └── notes.json         # Note storage
+├── hoshino.js             # Core HoshinoBot logic
+├── index.js               # Bot entry point
+└── README.md              # This documentation
+```
 
 ## 🙏 Thank you
 **For those** of you who have strayed into this repo.
 
-**For those** who have ever felt alone at night.
+**For those** of you who have ever felt lonely at night.
 
+**Hoshino** is ready to be your virtual conversation partner. 🌙💖
+
+## 👤 About the Author
+
+**Arash**
+
+- TikTok: [@rafardhancuy](https://tiktok.com/@rafardhancuy)
+
+- GitHub: [Rafacuy](https://github.com/Rafacuy)
+
+- Language: Indonesian
+
+- Time Zone: Asia/Jakarta
+
+- License: MIT
 
 ## 📜 License
-MIT License
-
-Made with 💘 by @rafardhancuy
+This project is licensed under the MIT License. Please see [LICENSE](./LICENSE) for details.
 
