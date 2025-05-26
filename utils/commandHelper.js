@@ -1,17 +1,17 @@
 // commandHelper.js
+// This file contains helper functions for various bot commands like reminders, notes, and search.
 
-const fs = require('fs').promises; // Untuk operasi sistem file (membaca/menulis JSON)
-const schedule = require('node-schedule'); // Untuk menjadwalkan pengingat
-const axios = require('axios'); // Untuk membuat permintaan HTTP ke API
-const config = require('../config/config'); // File konfigurasi untuk kunci API dan pengaturan lainnya
-const sendMessage = require('./sendMessage'); // Utilitas untuk mengirim pesan
-const { formatJakartaDateTime, formatJakartaTime } = require('./timeHelper'); // Utilitas untuk mendapatkan waktu Jakarta
-const moment = require('moment-timezone')
+const fs = require('fs').promises; // For file system operations (reading/writing JSON)
+const schedule = require('node-schedule'); // For scheduling reminders
+const axios = require('axios'); // For making HTTP requests to APIs
+const config = require('../config/config'); // Configuration file for API keys and other settings
+const sendMessage = require('./sendMessage'); // Utility for sending messages
+const { formatJakartaDateTime, formatJakartaTime, getJakartaMoment } = require('./timeHelper'); // Utility for getting Jakarta time
 
-const REMINDERS_FILE = './data/reminders.json'; // Path ke file JSON pengingat
-const NOTES_FILE = './data/notes.json'; // Path ke file JSON catatan
+const REMINDERS_FILE = './data/reminders.json'; // Path to the reminders JSON file
+const NOTES_FILE = './data/notes.json'; // Path to the notes JSON file
 
-// Pastikan direktori data ada
+// Ensure data directories exist
 const ensureDirExists = async (filePath) => {
     const dir = filePath.substring(0, filePath.lastIndexOf('/'));
     if (dir && dir !== '.') {
@@ -21,11 +21,11 @@ const ensureDirExists = async (filePath) => {
     }
 };
 
-// --- Fitur Pengingat ---
+// --- Reminder Feature ---
 
 /**
- * Memuat pengingat dari file JSON.
- * @returns {Promise<Array>} Sebuah array objek pengingat.
+ * Loads reminders from the JSON file.
+ * @returns {Promise<Array>} An array of reminder objects.
  */
 const loadReminders = async () => {
     await ensureDirExists(REMINDERS_FILE);
@@ -34,7 +34,7 @@ const loadReminders = async () => {
         return JSON.parse(data);
     } catch (error) {
         if (error.code === 'ENOENT') {
-            return []; // File tidak ada, kembalikan array kosong
+            return []; // File does not exist, return an empty array
         }
         console.error("Error loading reminders:", error);
         return [];
@@ -42,8 +42,8 @@ const loadReminders = async () => {
 };
 
 /**
- * Menyimpan pengingat ke file JSON.
- * @param {Array} reminders Array objek pengingat untuk disimpan.
+ * Saves reminders to the JSON file.
+ * @param {Array} reminders Array of reminder objects to save.
  */
 const saveReminders = async (reminders) => {
     await ensureDirExists(REMINDERS_FILE);
@@ -51,61 +51,63 @@ const saveReminders = async (reminders) => {
 };
 
 /**
- * Menjadwalkan pengingat.
- * @param {object} botInstance Instans API Bot Telegram.
- * @param {string|number} chatId ID obrolan tempat pengingat harus dikirim.
- * @param {string} timeString String waktu untuk pengingat (misalnya, "14:30", "tomorrow 10:00").
- * @param {string} message Pesan pengingat.
- * @param {string} userName Nama pengguna yang mengatur pengingat.
- * @returns {Promise<string>} Pesan yang menunjukkan keberhasilan atau kegagalan penjadwalan.
+ * Schedules a reminder.
+ * @param {object} botInstance Telegram Bot API instance.
+ * @param {string|number} chatId Chat ID where the reminder should be sent.
+ * @param {string} timeString Time string for the reminder (e.g., "14:30", "tomorrow 10:00").
+ * @param {string} message Reminder message.
+ * @param {string} userName User's name who set the reminder.
+ * @returns {Promise<string>} A message indicating success or failure of scheduling.
  */
 const setReminder = async (botInstance, chatId, timeString, message, userName) => {
-    const now = moment().tz('Asia/Jakarta');
+    const now = getJakartaMoment(); // Get current time in Jakarta timezone
     let reminderTime;
 
-    // Parsing waktu dasar (dapat diperluas untuk input yang lebih kompleks)
+    // Basic time parsing (can be extended for more complex inputs)
     const timeParts = timeString.split(':');
     if (timeParts.length === 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
         const hour = parseInt(timeParts[0], 10);
         const minute = parseInt(timeParts[1], 10);
 
-        reminderTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hour, minute, 0);
+        // Create a moment object for the reminder time in Jakarta timezone
+        reminderTime = now.clone().hour(hour).minute(minute).second(0);
 
-        // Jika waktu pengingat di masa lalu untuk hari ini, jadwalkan untuk besok
-        if (reminderTime < now) {
-            reminderTime.setDate(reminderTime.getDate() + 1);
+        // If the reminder time is in the past for today, schedule it for tomorrow
+        if (reminderTime.isBefore(now)) {
+            reminderTime.add(1, 'day');
         }
     } else if (timeString.toLowerCase().includes('tomorrow')) {
         const parts = timeString.toLowerCase().split(' ');
-        const time = parts[1]; // contoh: "10:00"
+        const time = parts[1]; // e.g., "10:00"
         const timePartsTomorrow = time.split(':');
         if (timePartsTomorrow.length === 2 && !isNaN(timePartsTomorrow[0]) && !isNaN(timePartsTomorrow[1])) {
             const hour = parseInt(timePartsTomorrow[0], 10);
             const minute = parseInt(timePartsTomorrow[1], 10);
-            reminderTime = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, hour, minute, 0);
+            reminderTime = now.clone().add(1, 'day').hour(hour).minute(minute).second(0);
         }
     } else {
         return `Maaf, Tuan ${userName}. Format waktu tidak valid. Gunakan format HH:MM atau 'tomorrow HH:MM'.`;
     }
 
-    if (!reminderTime || isNaN(reminderTime.getTime())) {
+    if (!reminderTime || !reminderTime.isValid()) {
         return `Maaf, Tuan ${userName}. Hoshino tidak bisa memahami waktu yang Anda berikan.`;
     }
 
     const reminders = await loadReminders();
     const newReminder = {
-        id: Date.now(), // ID unik untuk pengingat
+        id: Date.now(), // Unique ID for the reminder
         chatId: chatId,
-        time: reminderTime.toISOString(),
+        time: reminderTime.toISOString(), // Store as ISO string
         message: message,
         userName: userName
     };
     reminders.push(newReminder);
     await saveReminders(reminders);
 
-    schedule.scheduleJob(reminderTime, () => {
+    // Schedule the job using the Date object from moment
+    schedule.scheduleJob(reminderTime.toDate(), () => {
         sendMessage(chatId, `🔔 Pengingat untuk Tuan ${userName}:\n${message}`);
-        // Hapus pengingat setelah dipicu
+        // Remove the reminder after it's triggered
         loadReminders().then(currentReminders => {
             const updatedReminders = currentReminders.filter(r => r.id !== newReminder.id);
             saveReminders(updatedReminders);
@@ -119,21 +121,21 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
 };
 
 /**
- * Menjadwalkan ulang semua pengingat saat bot dimulai.
- * @param {object} botInstance Instans API Bot Telegram.
+ * Reschedules all reminders when the bot starts.
+ * @param {object} botInstance Telegram Bot API instance.
  */
 const rescheduleReminders = async (botInstance) => {
     const reminders = await loadReminders();
-    const now = moment().tz('Asia/Jakarta');
+    const now = getJakartaMoment();
 
     const activeReminders = [];
     for (const reminder of reminders) {
-        const reminderTime = new Date(reminder.time);
-        if (reminderTime > now) { // Hanya jadwalkan ulang pengingat di masa mendatang
+        const reminderTime = getJakartaMoment(reminder.time); // Use getJakartaMoment to parse stored ISO string
+        if (reminderTime.isAfter(now)) { // Only reschedule future reminders
             activeReminders.push(reminder);
-            schedule.scheduleJob(reminderTime, () => {
+            schedule.scheduleJob(reminderTime.toDate(), () => { 
                 sendMessage(reminder.chatId, `🔔 Pengingat untuk Tuan ${reminder.userName}:\n${reminder.message}`);
-                // Hapus pengingat setelah dipicu
+                // Remove the reminder after it's triggered
                 loadReminders().then(currentReminders => {
                     const updatedReminders = currentReminders.filter(r => r.id !== reminder.id);
                     saveReminders(updatedReminders);
@@ -141,16 +143,16 @@ const rescheduleReminders = async (botInstance) => {
             });
         }
     }
-    await saveReminders(activeReminders); // Simpan hanya pengingat yang aktif kembali
+    await saveReminders(activeReminders); // Save only active reminders back
     console.log(`Rescheduled ${activeReminders.length} reminders.`);
 };
 
-// --- Fitur Catatan ---
+// --- Note Feature ---
 
 /**
- * Memuat catatan untuk pengguna tertentu dari file JSON.
- * @param {string|number} userId ID pengguna.
- * @returns {Promise<Array>} Sebuah array objek catatan untuk pengguna.
+ * Loads notes for a specific user from the JSON file.
+ * @param {string|number} userId User ID.
+ * @returns {Promise<Array>} An array of note objects for the user.
  */
 const loadNotes = async (userId) => {
     await ensureDirExists(NOTES_FILE);
@@ -160,7 +162,7 @@ const loadNotes = async (userId) => {
         return allNotes[userId] || [];
     } catch (error) {
         if (error.code === 'ENOENT') {
-            return []; // File tidak ada, kembalikan array kosong
+            return []; // File does not exist, return an empty array
         }
         console.error("Error loading notes:", error);
         return [];
@@ -168,9 +170,9 @@ const loadNotes = async (userId) => {
 };
 
 /**
- * Menyimpan catatan untuk pengguna tertentu ke file JSON.
- * @param {string|number} userId ID pengguna.
- * @param {Array} userNotes Array objek catatan untuk pengguna yang akan disimpan.
+ * Saves notes for a specific user to the JSON file.
+ * @param {string|number} userId User ID.
+ * @param {Array} userNotes Array of note objects for the user to save.
  */
 const saveNotes = async (userId, userNotes) => {
     await ensureDirExists(NOTES_FILE);
@@ -188,16 +190,16 @@ const saveNotes = async (userId, userNotes) => {
 };
 
 /**
- * Menambahkan catatan baru untuk pengguna.
- * @param {string|number} userId ID pengguna.
- * @param {string} noteMessage Konten catatan.
- * @returns {Promise<string>} Pesan yang menunjukkan keberhasilan.
+ * Adds a new note for the user.
+ * @param {string|number} userId User ID.
+ * @param {string} noteMessage Content of the note.
+ * @returns {Promise<string>} A message indicating success.
  */
 const addNote = async (userId, noteMessage) => {
     const userNotes = await loadNotes(userId);
     const newNote = {
         id: Date.now(),
-        timestamp: new Date().toISOString(),
+        timestamp: getJakartaMoment().toISOString(), // Store timestamp in Jakarta timezone
         message: noteMessage
     };
     userNotes.push(newNote);
@@ -206,9 +208,9 @@ const addNote = async (userId, noteMessage) => {
 };
 
 /**
- * Menampilkan semua catatan untuk pengguna.
- * @param {string|number} userId ID pengguna.
- * @returns {Promise<string>} String yang diformat dari semua catatan atau pesan jika tidak ada catatan.
+ * Displays all notes for the user.
+ * @param {string|number} userId User ID.
+ * @returns {Promise<string>} Formatted string of all notes or a message if no notes exist.
  */
 const showNotes = async (userId) => {
     const userNotes = await loadNotes(userId);
@@ -217,18 +219,18 @@ const showNotes = async (userId) => {
     }
     let response = `Catatan pribadi Tuan ${userId}:\n\n`;
     userNotes.forEach((note, index) => {
-        const date = formatJakartaDateTime(note.timestamp);
+        const date = formatJakartaDateTime(note.timestamp); // Format timestamp using Jakarta timezone
         response += `${index + 1}. [${date}] ${note.message}\n`;
     });
     return response;
 };
 
-// --- Fitur Pencarian (Menggunakan Google Custom Search API) ---
+// --- Search Feature (Using Google Custom Search API) ---
 
 /**
- * Melakukan pencarian menggunakan Google Custom Search API.
- * @param {string} query Kueri pencarian.
- * @returns {Promise<string>} String yang diformat dengan hasil pencarian.
+ * Performs a search using Google Custom Search API.
+ * @param {string} query Search query.
+ * @returns {Promise<string>} Formatted string with search results.
  */
 const performSearch = async (query) => {
     const apiKey = config.GOOGLE_SEARCH_API_KEY;
@@ -244,7 +246,7 @@ const performSearch = async (query) => {
                 key: apiKey,
                 cx: cx,
                 q: query,
-                num: 3 // Mengambil 3 hasil teratas
+                num: 3 // Retrieve top 3 results
             }
         });
 
@@ -266,11 +268,11 @@ const performSearch = async (query) => {
     }
 };
 
-// --- Perintah Bantuan dan Penulis ---
+// --- Help and Author Commands ---
 
 /**
- * Mengembalikan daftar perintah yang tersedia.
- * @returns {string} String yang diformat yang mencantumkan semua perintah.
+ * Returns the list of available commands.
+ * @returns {string} A formatted string listing all commands.
  */
 const getHelpMessage = () => {
     return `Daftar perintah Hoshino:\n\n` +
@@ -283,8 +285,8 @@ const getHelpMessage = () => {
 };
 
 /**
- * Mengembalikan informasi tentang penulis.
- * @returns {string} String yang diformat dengan informasi penulis.
+ * Returns information about the author.
+ * @returns {string} A formatted string with author information.
  */
 const getAuthorInfo = () => {
     return `Hoshino v4.0 (Optimized)\n` +
@@ -295,7 +297,6 @@ const getAuthorInfo = () => {
            `TIME FORMAT: Asia/Jakarta\n` +
            `MIT License`;
 };
-
 
 module.exports = {
     setReminder,
