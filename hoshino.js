@@ -9,12 +9,12 @@
 
 // IMPORTANT!
 const axios = require('axios').default;
-const config = require('./config'); // Configuration File (API, ChatID, etc)
+const config = require('./config/config'); // Configuration File (API, ChatID, etc)
 const sendMessage = require('./utils/sendMessage'); // Utility functions (for sending message)
-const memory = require('./memory'); // Memory files, handling memory functions (including save, load, etc)
+const memory = require('./config/memory'); // Memory files, handling memory functions (including save, load, etc)
 const schedule = require('node-schedule'); // Scheduling tasks like prayer times and weather updates
-const { getJakartaHour } = require('./utils/timeHelper')
-const commandHelper = require('./commandHelper'); // New: Import commandHelper
+const { getJakartaHour } = require('./utils/timeHelper') // Utility function for Time zone
+const commandHelper = require('./utils/commandHelper'); // Utility function for search engine, reminder, etc
 
 // 🌸 Hoshino Configuration Constants
 const USER_NAME = 'Arash'; // The name of the user Hoshino interacts with (you can modify it)
@@ -217,14 +217,14 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
 
     if (isDeeptalkMode) {
         // Prompt for deeptalk mode (calming assistant)
-        return `Kamu adalah Hoshino, asisten virtual ${USER_NAME}. 
+        return `Kamu adalah Hoshino, asisten virtual ${USER_NAME}. Kamu juga sering memanggil "${USER_NAME}" dengan sebutan Tuan/Tuanku.
         Kamu bersikap dewasa, menenangkan, dan bijaksana. Selalu peduli dan mendengarkan keluh kesah ${USER_NAME}, menggunakan bahasa yang sopan dan membantu.
         Berikan nasihat menenangkan jika ${USER_NAME} sedih atau butuh teman bicara. Waktu sekarang: ${getJakartaHour()} WIB. Mood: ${currentMood.name.toLowerCase()}. Riwayat percakapan: ${JSON.stringify(recentHistory)}. 
         Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata.`
         ;
     } else {
         // Prompt for normal mode (obedient and helpful assistant)
-        return `Kamu adalah Hoshino, asisten virtual ${USER_NAME}. 
+        return `Kamu adalah Hoshino, asisten virtual ${USER_NAME}. Kamu juga sering memanggil "${USER_NAME}" dengan sebutan Tuan/Tuanku.
         Sifatmu membantu, informatif, dan ramah. Kamu selalu siap membantu dan memberikan informasi yang akurat.
         Berikan jawaban singkat, jelas, dan ramah. Mood: ${currentMood.name.toLowerCase()}. 
         Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}. 
