@@ -3,8 +3,8 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('./config/config');
-const hoshinoInteraction = require('./hoshino');
+const lyraInteraction = require('./Lyra');
 
 const bot = new TelegramBot(config.telegramBotToken, { polling: true });
 
-hoshinoInteraction(bot);
+lyraInteraction(bot);
