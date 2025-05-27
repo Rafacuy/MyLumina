@@ -90,7 +90,7 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
     }
 
     if (!reminderTime || !reminderTime.isValid()) {
-        return `Maaf, Tuan ${userName}. Hoshino tidak bisa memahami waktu yang Anda berikan.`;
+        return `Maaf, Tuan ${userName}. Lyra tidak bisa memahami waktu yang Anda berikan.`;
     }
 
     const reminders = await loadReminders();
@@ -117,7 +117,7 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
     const formattedTime = formatJakartaTime(reminderTime);
     const formattedDate = formatJakartaDateTime(reminderTime).split(',')[0] + ", " + formatJakartaDateTime(reminderTime).split(',')[1]; // Extract date part
 
-    return `Baik, Tuan ${userName}! Hoshino akan mengingatkan Anda pada ${formattedDate} pukul ${formattedTime} untuk: "${message}".`;
+    return `Baik, Tuan ${userName}! Lyra akan mengingatkan Anda pada ${formattedDate} pukul ${formattedTime} untuk: "${message}".`;
 };
 
 /**
@@ -204,7 +204,7 @@ const addNote = async (userId, noteMessage) => {
     };
     userNotes.push(newNote);
     await saveNotes(userId, userNotes);
-    return `Baik, Tuan! Catatan Anda telah Hoshino simpan.`;
+    return `Baik, Tuan! Catatan Anda telah Lyra simpan.`;
 };
 
 /**
@@ -215,7 +215,7 @@ const addNote = async (userId, noteMessage) => {
 const showNotes = async (userId) => {
     const userNotes = await loadNotes(userId);
     if (userNotes.length === 0) {
-        return `Tuan ${userId}, Anda belum memiliki catatan yang Hoshino simpan.`;
+        return `Tuan ${userId}, Anda belum memiliki catatan yang Lyra simpan.`;
     }
     let response = `Catatan pribadi Tuan ${userId}:\n\n`;
     userNotes.forEach((note, index) => {
@@ -252,7 +252,7 @@ const performSearch = async (query) => {
 
         const data = response.data;
         if (data.items && data.items.length > 0) {
-            let result = `Hoshino menemukan ini untuk "${query}":\n\n`;
+            let result = `Lyra menemukan ini untuk "${query}":\n\n`;
             data.items.forEach((item, index) => {
                 result += `${index + 1}. ${item.title}\n`;
                 result += `${item.snippet}\n`;
@@ -260,7 +260,7 @@ const performSearch = async (query) => {
             });
             return result;
         } else {
-            return `Maaf, Tuan. Hoshino tidak menemukan hasil yang relevan untuk "${query}".`;
+            return `Maaf, Tuan. Lyra tidak menemukan hasil yang relevan untuk "${query}".`;
         }
     } catch (error) {
         console.error("Error fetching from Google Custom Search API:", error.message);
@@ -275,13 +275,13 @@ const performSearch = async (query) => {
  * @returns {string} A formatted string listing all commands.
  */
 const getHelpMessage = () => {
-    return `Daftar perintah Hoshino:\n\n` +
+    return `Daftar perintah Lyra:\n\n` +
            `• /reminder [HH:MM] [pesan]: Menjadwalkan pengingat.\n` +
            `• /note [pesan]*: Menyimpan catatan pribadi.\n` +
            `• /shownotes*: Menampilkan semua catatan pribadi Anda.\n` +
            `• /search [query]: Mencari informasi menggunakan Google.\n` +
            `• /help : Menampilkan daftar perintah ini.\n` +
-           `• /author : Menampilkan informasi penulis Hoshino.\n`;
+           `• /author : Menampilkan informasi penulis Lyra.\n`;
 };
 
 /**
@@ -289,7 +289,7 @@ const getHelpMessage = () => {
  * @returns {string} A formatted string with author information.
  */
 const getAuthorInfo = () => {
-    return `Hoshino v4.0 (Optimized)\n` +
+    return `Lyra v4.0 (Optimized)\n` +
            `AUTHOR: Arash\n` +
            `TIKTOK: @rafardhancuy\n` +
            `Github: https://github.com/Rafacuy\n` +
