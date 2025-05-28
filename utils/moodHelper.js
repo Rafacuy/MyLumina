@@ -3,6 +3,7 @@
 const sendMessage = require('./sendMessage'); // Utilities for sending messages
 const commandHelper = require('./commandHelper'); // Utilities for commands
 const lyra = require('../Lyra') // For Lyra Configuration
+const { generateAIResponse } = require('../Lyra')
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weatherHelper'); // Weather utility
 
 // 🌸 Lyra Configuration 
@@ -22,7 +23,6 @@ const Mood = {
 
 // Global State Variables
 let currentMood = Mood.NORMAL; // Mood Lyra saat ini
-let generateAIResponse = lyra.generateAIResponse
 let moodTimeoutId; // Menyimpan ID timeout reset mood
 let botInstanceRef; // Referensi ke instance bot Telegram
 
@@ -295,8 +295,7 @@ const commandHandlers = [
                     await lyraTyping(chatId);
                     sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Lyra akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
 
-                    // Panggil fungsi performSearch dari commandHelper
-                    // Pastikan 'generateAIResponse' tersedia dalam scope ini
+
                     const searchResultText = await commandHelper.performSearch(
                         query,
                         userNameForCommand,
