@@ -335,31 +335,6 @@ const commandHandlers = [
     }
 ];    
 
-if (text.toLowerCase().startsWith('/search ')) {
-    const query = text.substring('/search '.length).trim();
-    const userNameForCommand = from.first_name || USER_NAME; // Gunakan nama depan Telegram jika ada
-
-    if (query) {
-        await lyraTyping(currentMessageChatId); // Tampilkan Lyra sedang mengetik
-        // Beri tahu pengguna bahwa proses mungkin memakan waktu
-        sendMessage(currentMessageChatId, `Baik, Tuan ${userNameForCommand}. Lyra akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${Mood.NORMAL.emoji}`); 
-
-        // Panggil performSearch dari commandHelper, teruskan fungsi generateAIResponse
-        // Pastikan generateAIResponse adalah fungsi yang bisa diakses di scope ini
-        // dan memiliki signatur (prompt, requestChatId)
-        const searchResult = await commandHelper.performSearch(
-            query,
-            userNameForCommand,
-            currentMessageChatId, // Untuk pembatasan laju & konteks dalam generateAIResponse
-            generateAIResponse    // Teruskan fungsi AI yang sebenarnya
-        );
-        sendMessage(currentMessageChatId, searchResult); // Kirim hasil pencarian dan ringkasan yang diformat
-    } else {
-        // Jika tidak ada query setelah /search
-        sendMessage(currentMessageChatId, `Tuan ${userNameForCommand}, mohon berikan kata kunci pencarian setelah perintah /search. Contoh: /search resep nasi goreng ${Mood.NORMAL.emoji}`);
-    }
-    return; // Hentikan pemrosesan, perintah sudah ditangani
-}
 
 /**
  * Mengatur instance bot Telegram. Ini harus dipanggil sekali saat inisialisasi.
