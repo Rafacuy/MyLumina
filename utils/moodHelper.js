@@ -2,12 +2,10 @@
 
 const sendMessage = require('./sendMessage'); // Utilities for sending messages
 const commandHelper = require('./commandHelper'); // Utilities for commands
-const lyra = require('../Lyra') // For Lyra Configuration
-const { generateAIResponse } = require('../Lyra')
+const { generateAIResponse, USER_NAME } = require('../Lyra')
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weatherHelper'); // Weather utility
 
 // 🌸 Lyra Configuration 
-const USER_NAME = lyra.USER_NAME || 'Tuan'; // User Name
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
 
 // Mood Definitions
@@ -25,6 +23,13 @@ const Mood = {
 let currentMood = Mood.NORMAL; // Mood Lyra saat ini
 let moodTimeoutId; // Menyimpan ID timeout reset mood
 let botInstanceRef; // Referensi ke instance bot Telegram
+let globalAISummarizer = null;
+
+const setAISummarizer = (fn) => {
+    globalAISummarizer = fn;
+};
+
+const getAISummarizer = () => globalAISummarizer;
 
 // Lagu Sedih
 const sadSongs = [
@@ -135,6 +140,7 @@ const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
         }, durationMs);
     }
 };
+
 
 /**
  * Mendapatkan mood acak dari konstanta Mood yang telah ditentukan, tidak termasuk mood yang ditujukan untuk mode tertentu (seperti CALM).
@@ -300,7 +306,7 @@ const commandHandlers = [
                         query,
                         userNameForCommand,
                         chatId,
-                        generateAIResponse // Fungsi AI dari Lyra.js
+                        getAISummarizer()
                     );
                     // sendMessage(chatId, searchResultText); // Ini akan dikirim oleh return { text: searchResultText }
                     return { text: searchResultText }; // Kembalikan teks untuk dikirim oleh loop handler utama
@@ -357,4 +363,5 @@ module.exports = {
     setBotInstance,
     getCurrentMood,
     lyraTyping, 
+    setAISummarizer
 };

@@ -8,6 +8,7 @@ const axios = require('axios'); // Untuk membuat permintaan HTTP ke API
 const config = require('../config/config'); // File konfigurasi untuk kunci API dan pengaturan lainnya
 const sendMessage = require('./sendMessage'); // Utilitas untuk mengirim pesan (pastikan ada dan tangguh)
 const { formatJakartaDateTime, formatJakartaTime, getJakartaMoment } = require('./timeHelper'); // Utilitas untuk waktu Jakarta (pastikan ada dan tangguh)
+const { generateAIResponse } = require('../Lyra');
 
 const REMINDERS_FILE = './data/reminders.json'; // Path ke file JSON pengingat
 const NOTES_FILE = './data/notes.json'; // Path ke file JSON catatan
@@ -334,6 +335,8 @@ const showNotes = async (userId, userName) => {
     }
 };
 
+
+
 // --- Fitur Pencarian (Menggunakan Google Custom Search API & Lyra AI untuk Ringkasan) ---
 
 /**
@@ -344,7 +347,7 @@ const showNotes = async (userId, userName) => {
  * @param {Function} aiSummarizer Fungsi dari Lyra.js untuk menghasilkan ringkasan AI (misalnya, generateAIResponse).
  * @returns {Promise<string>} String yang diformat dengan hasil pencarian dan ringkasannya.
  */
-const performSearch = async (query, userName, requestChatId, aiSummarizer) => {
+async function performSearch(query, userName, requestChatId, aiSummarizer) {
     if (!query || typeof query !== 'string' || query.trim() === "") {
         return `Maaf, Tuan ${userName}. Mohon berikan kata kunci pencarian yang valid.`;
     }
@@ -363,9 +366,9 @@ const performSearch = async (query, userName, requestChatId, aiSummarizer) => {
                 key: apiKey,
                 cx: cx,
                 q: query,
-                num: 3, // Ambil 3 hasil teratas
-                hl: 'id', // Minta hasil dalam bahasa Indonesia
-                gl: 'id'  // Bias geolokasi ke Indonesia
+                num: 3,
+                hl: 'id',
+                gl: 'id' // Bias geolokasi ke Indonesia
             }
         });
 
@@ -389,7 +392,7 @@ const performSearch = async (query, userName, requestChatId, aiSummarizer) => {
                 try {
                     // Prompt yang lebih spesifik untuk memandu gaya Lyra
                     const summarizationPrompt = `Sebagai Lyra, asisten AI yang cerdas dan sedikit tsundere, ringkaskan dengan gaya khasmu informasi berikut yang ditemukan untuk Tuan ${userName} terkait pencarian "${query}". Buat ringkasan yang informatif namun tetap singkat dan menarik:\n\n${contentToSummarize}`;
-                    
+
                     const summary = await aiSummarizer(summarizationPrompt, requestChatId);
 
                     // Periksa apakah ringkasan valid dan bukan pesan error/placeholder dari Lyra
@@ -404,8 +407,8 @@ const performSearch = async (query, userName, requestChatId, aiSummarizer) => {
                     resultText += `Ugh, terjadi kesalahan teknis saat Lyra mencoba membuat ringkasan, Tuan ${userName}. Menyebalkan.\n\n`;
                 }
             } else if (typeof aiSummarizer !== 'function') {
-                 resultText += `\n--- Ringkasan dari Lyra ---\nFitur ringkasan AI tidak tersedia saat ini karena ada masalah teknis, Tuan ${userName}.\n\n`;
-                 console.warn("Fungsi aiSummarizer tidak diberikan ke performSearch. Ringkasan dilewati.");
+                resultText += `\n--- Ringkasan dari Lyra ---\nFitur ringkasan AI tidak tersedia saat ini karena ada masalah teknis, Tuan ${userName}.\n\n`;
+                console.warn("Fungsi aiSummarizer tidak diberikan ke performSearch. Ringkasan dilewati.");
             }
             return resultText;
         } else {
@@ -416,7 +419,7 @@ const performSearch = async (query, userName, requestChatId, aiSummarizer) => {
         // Fallback untuk error API
         let errorMessage = `Maaf, Tuan ${userName}. Terjadi masalah saat Lyra mencoba menghubungi layanan pencarian.`;
         if (error.response && error.response.status === 403) { // Forbidden, seringkali masalah kunci API atau kuota
-             errorMessage += ` Sepertinya ada masalah dengan konfigurasi API pencarian atau kuota telah terlampaui.`;
+            errorMessage += ` Sepertinya ada masalah dengan konfigurasi API pencarian atau kuota telah terlampaui.`;
         } else if (error.response && error.response.data && error.response.data.error && error.response.data.error.message) {
             errorMessage += ` Detail dari Google: ${error.response.data.error.message}`;
         } else if (error.isAxiosError && error.message.includes('timeout')) {
@@ -426,7 +429,7 @@ const performSearch = async (query, userName, requestChatId, aiSummarizer) => {
         }
         return errorMessage;
     }
-};
+}
 
 
 // --- Help Command dan Author ---

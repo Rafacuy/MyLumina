@@ -55,7 +55,7 @@ memory.load().then(data => {
 
 /**
  * Menghasilkan prompt sistem untuk AI berdasarkan mode dan mood saat ini.
- * @param {boolean} isDeeptalkMode - True jika Lyra dalam mode deeptalk.
+ * @param {boolean} isDeeptalkMode - True jika dalam mode deeptalk.
  * @param {object} currentMood - Objek mood saat ini.
  * @returns {string} String prompt sistem.
  */
@@ -276,109 +276,115 @@ const updateTimeBasedModes = (chatId) => {
     }
 };
 
-
 /**
  * Fungsi ekspor modul utama untuk menginisialisasi bot Telegram.
  * Fungsi ini mengatur pendengar pesan dan menjadwalkan tugas berulang.
  * @param {object} bot Instance API Bot Telegram (misal, dari `node-telegram-bot-api`).
  */
-module.exports = (bot) => {
-    setBotInstance(bot); // Tetapkan instance bot yang diteruskan ke moodHelper
-    const configuredChatId = config.TARGET_CHAT_ID || config.chatId; // Tentukan ID obrolan target untuk pesan terjadwal
 
-    console.log(`🌸 LyraBot v2.0 (Asisten Virtual) aktif untuk ${USER_NAME}!`);
-    if (configuredChatId) {
-        console.log(`📬 Pesan terjadwal (Waktu Sholat, Cuaca, Lagu Sedih) akan dikirim ke ID obrolan: ${configuredChatId}`);
-    } else {
-        console.warn("⚠️ TARGET_CHAT_ID tidak ditemukan di config.js. Pesan terjadwal (Waktu Sholat, Cuaca, Lagu Sedih) TIDAK akan dikirim.");
-        console.warn("Harap tambahkan TARGET_CHAT_ID: 'your_chat_id' ke file config.js Anda untuk mengaktifkan pesan terjadwal.");
-    }
+module.exports = {
+    USER_NAME,
+    generateAIResponse,
+    initLyrabot: (bot) => {
+        setBotInstance(bot); // Tetapkan instance bot yang diteruskan ke moodHelper
+        const configuredChatId = config.TARGET_CHAT_ID || config.chatId; // Tentukan ID obrolan target untuk pesan terjadwal
 
-    // Jadwalkan ulang pengingat yang ada saat startup
-    // commandHelper.rescheduleReminders(bot); // Ini perlu di-refactor jika commandHelper tidak lagi memiliki akses langsung ke bot instance
-
-    // Daftarkan pendengar untuk semua pesan masuk
-    bot.on('message', async (msg) => {
-        const { chat, text, from } = msg;
-        const currentMessageChatId = chat.id;
-        const currentMood = getCurrentMood(); // Dapatkan mood saat ini dari moodHelper
-
-        // Simpan pesan obrolan terakhir ke memori
-        // Ini sekarang akan menggunakan addMessage/saveLastChat yang dioptimalkan dari memory.js
-        await memory.saveLastChat(msg);
-
-        // Validasi dasar untuk pesan teks masuk
-        if (!text || text.trim() === "") {
-            return; // Abaikan pesan kosong atau hanya spasi
-        }
-        // Abaikan pesan satu karakter jika hanya emoji atau angka
-        if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text))) {
-            return;
+        console.log(`🌸 LyraBot v2.0 (Asisten Virtual) aktif untuk ${USER_NAME}!`);
+        if (configuredChatId) {
+            console.log(`📬 Pesan terjadwal (Waktu Sholat, Cuaca, Lagu Sedih) akan dikirim ke ID obrolan: ${configuredChatId}`);
+        } else {
+            console.warn("⚠️ TARGET_CHAT_ID tidak ditemukan di config.js. Pesan terjadwal (Waktu Sholat, Cuaca, Lagu Sedih) TIDAK akan dikirim.");
+            console.warn("Harap tambahkan TARGET_CHAT_ID: 'your_chat_id' ke file config.js Anda untuk mengaktifkan pesan terjadwal.");
         }
 
-        // Periksa apakah pesan cocok dengan handler perintah yang telah ditentukan
-        // Iterasi melalui handler dan jalankan jika ditemukan kecocokan
-        for (const handler of commandHandlers) {
-            // Teruskan objek pesan lengkap (msg) ke fungsi respons handler
-            // Ini penting untuk perintah seperti /reminder dan /note yang membutuhkan ID pengguna atau teks lengkap
-            if (handler.pattern.test(text)) {
-                const result = await handler.response(currentMessageChatId, msg);
-                await lyraTyping(currentMessageChatId); // Tampilkan indikator mengetik
-                if (result.text) {
-                    sendMessage(currentMessageChatId, result.text);
-                }
-                if (result.mood) {
-                    setMood(currentMessageChatId, result.mood); // Atur mood Lyra
-                }
-                return; // Berhenti memproses setelah menangani perintah
+        // Jadwalkan ulang pengingat yang ada saat startup
+        // commandHelper.rescheduleReminders(bot); // Ini perlu di-refactor jika commandHelper tidak lagi memiliki akses langsung ke bot instance
+
+        // Daftarkan pendengar untuk semua pesan masuk
+        bot.on('message', async (msg) => {
+            const { chat, text, from } = msg;
+            const currentMessageChatId = chat.id;
+            const currentMood = getCurrentMood(); // Dapatkan mood saat ini dari moodHelper
+
+            // Simpan pesan obrolan terakhir ke memori
+            // Ini sekarang akan menggunakan addMessage/saveLastChat yang dioptimalkan dari memory.js
+            await memory.saveLastChat(msg);
+
+            // Validasi dasar untuk pesan teks masuk
+            if (!text || text.trim() === "") {
+                return; // Abaikan pesan kosong atau hanya spasi
             }
-        }
+            // Abaikan pesan satu karakter jika hanya emoji atau angka
+            if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text))) {
+                return;
+            }
 
-        // Jika tidak ada perintah yang cocok, hasilkan respons AI
-        await lyraTyping(currentMessageChatId); // Tampilkan indikator mengetik
-        const aiResponse = await generateAIResponse(text, currentMessageChatId); // Dapatkan respons AI
-        sendMessage(currentMessageChatId, `${aiResponse} ${currentMood.emoji}`); // Kirim respons AI dengan emoji mood saat ini
-    });
+            // Periksa apakah pesan cocok dengan handler perintah yang telah ditentukan
+            // Iterasi melalui handler dan jalankan jika ditemukan kecocokan
+            for (const handler of commandHandlers) {
+                // Teruskan objek pesan lengkap (msg) ke fungsi respons handler
+                // Ini penting untuk perintah seperti /reminder dan /note yang membutuhkan ID pengguna atau teks lengkap
+                if (handler.pattern.test(text)) {
+                    const result = await handler.response(currentMessageChatId, msg);
+                    await lyraTyping(currentMessageChatId); // Tampilkan indikator mengetik
+                    if (result.text) {
+                        sendMessage(currentMessageChatId, result.text);
+                    }
+                    if (result.mood) {
+                        setMood(currentMessageChatId, result.mood); // Atur mood Lyra
+                    }
+                    return; // Berhenti memproses setelah menangani perintah
+                }
+            }
 
-    // Jadwalkan tugas berulang hanya jika TARGET_CHAT_ID dikonfigurasi
-    if (configuredChatId) {
-        // Jadwalkan pengingat waktu sholat harian
-        Object.entries(PrayerTimes).forEach(([name, { hour, minute, emoji }]) => {
-            const cronTime = `${minute} ${hour} * * *`; // Format Cron: Menit Jam HariBulan Bulan HariMinggu
-            schedule.scheduleJob({ rule: cronTime, tz: 'Asia/Jakarta' }, () => {
-                console.log(`Mengirim pengingat waktu sholat untuk ${name} pada ${hour}:${minute} (Asia/Jakarta) ke ${configuredChatId}`);
-                sendMessage(configuredChatId, `${emoji} ${USER_NAME}, waktunya shalat ${name}, nih~ Jangan sampai terlewat! ${emoji}`);
+            // Jika tidak ada perintah yang cocok, hasilkan respons AI
+            await lyraTyping(currentMessageChatId); // Tampilkan indikator mengetik
+            const aiResponse = await generateAIResponse(text, currentMessageChatId); // Dapatkan respons AI
+            sendMessage(currentMessageChatId, `${aiResponse} ${currentMood.emoji}`); // Kirim respons AI dengan emoji mood saat ini
+        });
+
+        // Jadwalkan tugas berulang hanya jika TARGET_CHAT_ID dikonfigurasi
+        if (configuredChatId) {
+            // Jadwalkan pengingat waktu sholat harian
+            Object.entries(PrayerTimes).forEach(([name, { hour, minute, emoji }]) => {
+                const cronTime = `${minute} ${hour} * * *`; // Format Cron: Menit Jam HariBulan Bulan HariMinggu
+                schedule.scheduleJob({ rule: cronTime, tz: 'Asia/Jakarta' }, () => {
+                    console.log(`Mengirim pengingat waktu sholat untuk ${name} pada ${hour}:${minute} (Asia/Jakarta) ke ${configuredChatId}`);
+                    sendMessage(configuredChatId, `${emoji} ${USER_NAME}, waktunya shalat ${name}, nih~ Jangan sampai terlewat! ${emoji}`);
+                });
             });
-        });
 
-        // Jadwalkan pembaruan cuaca berkala (setiap 5 jam)
-        schedule.scheduleJob({ rule: '0 */5 * * *', tz: 'Asia/Jakarta' }, async () => {
-            console.log(`Memperbarui cuaca (Asia/Jakarta) untuk ID obrolan: ${configuredChatId}`);
-            const weather = await getWeatherData(); // Ambil data cuaca
-            if (weather) {
-                // Jika data cuaca tersedia, kirim info cuaca yang diformat dan pengingat
-                sendMessage(configuredChatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
-            } else {
-                // Jika data cuaca tidak dapat diambil, kirim pesan kesalahan
-                sendMessage(configuredChatId, `Hmm... Lyra sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`);
-            }
-        });
+            // Jadwalkan pembaruan cuaca berkala (setiap 5 jam)
+            schedule.scheduleJob({ rule: '0 */5 * * *', tz: 'Asia/Jakarta' }, async () => {
+                console.log(`Memperbarui cuaca (Asia/Jakarta) untuk ID obrolan: ${configuredChatId}`);
+                const weather = await getWeatherData(); // Ambil data cuaca
+                if (weather) {
+                    // Jika data cuaca tersedia, kirim info cuaca yang diformat dan pengingat
+                    sendMessage(configuredChatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
+                } else {
+                    // Jika data cuaca tidak dapat diambil, kirim pesan kesalahan
+                    sendMessage(configuredChatId, `Hmm... Lyra sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`);
+                }
+            });
 
-        // Jadwalkan notifikasi lagu sedih pada 22:00 (10 malam) setiap hari
-        schedule.scheduleJob({ rule: '0 22 * * *', tz: 'Asia/Jakarta' }, async () => { // Jadikan async
-            console.log(`Mengirim notifikasi lagu sedih pada 22:00 (Asia/Jakarta) ke ${configuredChatId}`);
-            // sendSadSongNotification(configuredChatId); // Ini perlu di-refactor jika sendSadSongNotification tidak lagi memiliki akses langsung ke bot instance
-        });
+            // Jadwalkan notifikasi lagu sedih pada 22:00 (10 malam) setiap hari
+            schedule.scheduleJob({ rule: '0 22 * * *', tz: 'Asia/Jakarta' }, async () => { // Jadikan async
+                console.log(`Mengirim notifikasi lagu sedih pada 22:00 (Asia/Jakarta) ke ${configuredChatId}`);
+                // sendSadSongNotification(configuredChatId); // Ini perlu di-refactor jika sendSadSongNotification tidak lagi memiliki akses langsung ke bot instance
+            });
 
-        // Jadwalkan pembersihan cache dan memori otomatis setiap 30 menit
-        setInterval(cleanupCacheAndMemory, CACHE_CLEANUP_INTERVAL_MS);
-        console.log(`Pembersihan cache dan memori terjadwal setiap ${CACHE_CLEANUP_INTERVAL_MS / 1000 / 60} menit.`);
+            // Jadwalkan pembersihan cache dan memori otomatis setiap 30 menit
+            setInterval(cleanupCacheAndMemory, CACHE_CLEANUP_INTERVAL_MS);
+            console.log(`Pembersihan cache dan memori terjadwal setiap ${CACHE_CLEANUP_INTERVAL_MS / 1000 / 60} menit.`);
 
-        // Jadwalkan pembaruan mode berbasis waktu (mood acak dan deeptalk) setiap jam pada awal jam
-        schedule.scheduleJob({ rule: '0 * * * *', tz: 'Asia/Jakarta' }, () => {
-             updateTimeBasedModes(configuredChatId);
-        });
-        // Jalankan sekali saat startup untuk mengatur mode/mood awal berdasarkan waktu saat ini
-        updateTimeBasedModes(configuredChatId);
+            // Jadwalkan pembaruan mode berbasis waktu (mood acak dan deeptalk) setiap jam pada awal jam
+            schedule.scheduleJob({ rule: '0 * * * *', tz: 'Asia/Jakarta' }, () => {
+                updateTimeBasedModes(configuredChatId);
+            });
+            // Jalankan sekali saat startup untuk mengatur mode/mood awal berdasarkan waktu saat ini
+            updateTimeBasedModes(configuredChatId);
+        }
     }
 };
+
+
