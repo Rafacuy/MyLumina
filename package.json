@@ -1,7 +1,7 @@
 {
-  "name": "hoshino-chatbot",
-  "version": "1.0.0",
-  "description": "Chatbot Hoshino yang siap nemenin kamu saat kesepian! >V<",
+  "name": "lyra-chatbot",
+  "version": "5.1.0",
+  "description": "Chatbot Lyra yang siap nemenin kamu saat kesepian! >V<",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
