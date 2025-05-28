@@ -22,6 +22,7 @@ const Mood = {
 
 // Global State Variables
 let currentMood = Mood.NORMAL; // Mood Lyra saat ini
+let generateAIResponse = lyra.generateAIResponse
 let moodTimeoutId; // Menyimpan ID timeout reset mood
 let botInstanceRef; // Referensi ke instance bot Telegram
 
@@ -277,12 +278,41 @@ const commandHandlers = [
     },
     // Perintah baru: Search
     {
-        pattern: /^\/search\s+(.+)/i,
-        response: async (chatId, msg) => {
-            await lyraTyping(chatId);
-            const [, query] = msg.text.match(/^\/search\s+(.+)/i);
-            const responseText = await commandHelper.performSearch(query);
-            return { text: responseText, mood: Mood.NORMAL };
+        pattern: /^\/search\s+(.+)$/i, // Pola RegEx 
+        response: async (chatId, msg) => { 
+            try {
+                // Ekstrak kueri pencarian dari pesan menggunakan pola RegEx
+                const match = msg.text.match(/^\/search\s+(.+)$/i);
+                if (!match || !match[1]) {
+                    // Seharusnya tidak terjadi jika pattern.test() sudah lolos, tapi sebagai pengaman
+                    sendMessage(chatId, `Maaf, Tuan ${msg.from.first_name || USER_NAME}. Format perintah /search tidak benar.`);
+                    return {}; // Kembalikan objek kosong atau sesuai struktur respons handler Tuan
+                }
+                const query = match[1].trim(); // match[1] berisi teks yang ditangkap oleh grup (.+)
+                const userNameForCommand = msg.from.first_name || USER_NAME;
+
+                if (query) {
+                    await lyraTyping(chatId);
+                    sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Lyra akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
+
+                    // Panggil fungsi performSearch dari commandHelper
+                    // Pastikan 'generateAIResponse' tersedia dalam scope ini
+                    const searchResultText = await commandHelper.performSearch(
+                        query,
+                        userNameForCommand,
+                        chatId,
+                        generateAIResponse // Fungsi AI dari Lyra.js
+                    );
+                    // sendMessage(chatId, searchResultText); // Ini akan dikirim oleh return { text: searchResultText }
+                    return { text: searchResultText }; // Kembalikan teks untuk dikirim oleh loop handler utama
+                } else {
+                    // Ini juga seharusnya tidak terjadi jika pola RegEx memerlukan (.+) alias opsional
+                     return { text: `Tuan ${userNameForCommand}, mohon berikan kata kunci pencarian setelah perintah /search.` };
+                }
+            } catch (error) {
+                console.error("Error di handler /search:", error);
+                return { text: `Maaf, Tuan ${msg.from.first_name || USER_NAME}. Terjadi kesalahan internal saat memproses perintah pencarian Anda.` };
+            }
         }
     },
     // Perintah baru: Help
@@ -303,7 +333,33 @@ const commandHandlers = [
             return { text: responseText, mood: Mood.NORMAL };
         }
     }
-];
+];    
+
+if (text.toLowerCase().startsWith('/search ')) {
+    const query = text.substring('/search '.length).trim();
+    const userNameForCommand = from.first_name || USER_NAME; // Gunakan nama depan Telegram jika ada
+
+    if (query) {
+        await lyraTyping(currentMessageChatId); // Tampilkan Lyra sedang mengetik
+        // Beri tahu pengguna bahwa proses mungkin memakan waktu
+        sendMessage(currentMessageChatId, `Baik, Tuan ${userNameForCommand}. Lyra akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${Mood.NORMAL.emoji}`); 
+
+        // Panggil performSearch dari commandHelper, teruskan fungsi generateAIResponse
+        // Pastikan generateAIResponse adalah fungsi yang bisa diakses di scope ini
+        // dan memiliki signatur (prompt, requestChatId)
+        const searchResult = await commandHelper.performSearch(
+            query,
+            userNameForCommand,
+            currentMessageChatId, // Untuk pembatasan laju & konteks dalam generateAIResponse
+            generateAIResponse    // Teruskan fungsi AI yang sebenarnya
+        );
+        sendMessage(currentMessageChatId, searchResult); // Kirim hasil pencarian dan ringkasan yang diformat
+    } else {
+        // Jika tidak ada query setelah /search
+        sendMessage(currentMessageChatId, `Tuan ${userNameForCommand}, mohon berikan kata kunci pencarian setelah perintah /search. Contoh: /search resep nasi goreng ${Mood.NORMAL.emoji}`);
+    }
+    return; // Hentikan pemrosesan, perintah sudah ditangani
+}
 
 /**
  * Mengatur instance bot Telegram. Ini harus dipanggil sekali saat inisialisasi.

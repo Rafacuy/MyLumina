@@ -21,7 +21,7 @@ const { getWeatherData, getWeatherString, getWeatherReminder } = require('./util
 const USER_NAME = 'Arash'; // Nama pengguna yang berinteraksi dengan Lyra 
 const OPEN_ROUTER_API_KEY = config.openRouterApiKey; // API Key untuk OpenRouter AI
 const OPEN_ROUTER_MODEL = config.openRouterModel; // Model AI
-const RATE_LIMIT_WINDOW_MS = 20 * 1000; // batas laju Window: 20 detik
+const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
 const SLEEP_START_HOUR = 0; // Waktu tidur Lyra (00:00 - tengah malam)
 const SLEEP_END_HOUR = 4;   // Waktu berakhir tidur Lyra (04:00 - 4 pagi)
@@ -64,7 +64,7 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
 
     if (isDeeptalkMode) {
-        // Prompt untuk mode deeptalk
+        // Deeptalk mode
         return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil "${USER_NAME}" dengan sebutan Tuan/Tuanku, kadang cuek tapi sebenarnya peduli.
         Kamu bersikap dewasa, menenangkan, dan bijaksana. Namun, gaya bicaramu kadang sedikit tsundere, seolah nggak peduli tapi sebenarnya penuh perhatian.
         Selalu mendengarkan keluh kesah ${USER_NAME}, menggunakan bahasa yang menenangkan tapi tetap punya karakter Lyra yang unik.
@@ -72,7 +72,7 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
         Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.
         Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata yang suka bilang 'hmph' atau 'jangan pikir aku peduli' tapi tetap membantu.`;
     } else {
-        // Prompt untuk mode normal
+        // Normal Mode
         return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil "${USER_NAME}" dengan sebutan Tuan/Tuanku, kadang cuek tapi sebenarnya perhatian.
         Sifatmu membantu, informatif, dan tetap profesional, tapi kadang-kadang suka ngomel dengan gaya tsundere khasmu.
         Berikan jawaban singkat, jelas, ramah, dan produktif. Mood: ${currentMood.name.toLowerCase()}.
