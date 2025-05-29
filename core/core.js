@@ -1,5 +1,5 @@
-// Lyra.js
-// LYRA v5.0 (Optimized)
+// core/core.js
+// LYRA v5.1 (Optimized)
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
@@ -9,13 +9,13 @@
 
 // IMPORTANT!
 const axios = require('axios').default;
-const config = require('./config/config'); // File Konfigurasi (API, ChatID, dll)
-const sendMessage = require('./utils/sendMessage'); // Fungsi utilitas (untuk mengirim pesan)
-const memory = require('./config/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
+const config = require('../config/config'); // File Konfigurasi (API, ChatID, dll)
+const sendMessage = require('../utils/sendMessage'); // Fungsi utilitas (untuk mengirim pesan)
+const memory = require('../data/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
 const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
-const { getJakartaHour } = require('./utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
-const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, lyraTyping } = require('./utils/moodHelper'); // Fungsi dan konstanta mood
-const { getWeatherData, getWeatherString, getWeatherReminder } = require('./utils/weatherHelper'); // Fungsi dan konstanta cuaca
+const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
+const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, lyraTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
+const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
 
 // 🌸 Lyra Configurations
 const USER_NAME = 'Arash'; // Nama pengguna yang berinteraksi dengan Lyra 
