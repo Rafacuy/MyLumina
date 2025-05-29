@@ -1,7 +1,7 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 🌸 LyraBot v4.0 – Productive Assistant
+# 🌸 LyraBot v6.0 – Productive Assistant
 
 > Telegram ChatBot smart, and act as your assistant.  
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)  
@@ -11,12 +11,13 @@
 
 ## ✨ What's New in v4.0?
 
-- 🧠 **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
+-  **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
 - 💾 **Ring Buffer + Archival**: History auto-archive, no RAM overload
 - 🌙 **Dynamic DeepTalk Mode**: Curhat mode active between 21:00 - 04:00
 - 📦 **Cache, Limit, Schedule, Backup**: Optimize VPS usage & resources
 - 💬 **Custom Command Additions**: More interactive commands (reminder, note, search)
 - 🌐 **Improved Web Search**: Now supports Google Custom Search with your API key
+- **Holidays Information**: Notifying important days / day information
 
 ---
 
@@ -68,6 +69,7 @@ WEATHER_API_KEY=YOUR_OPENWEATHERMAP_KEY # Replace it to your actual OpenWeather 
 LATITUDE=-6.200000 # Change it to your location LATITUDE (e.g, Jakarta)
 LONGITUDE=106.816666 # Change it to your location LONGITUDE (e.g, jakarta)
 TARGET_CHAT_ID=YOUR_CHAT_ID # Your Chat ID
+CALENDARIFIC_API_KEY=YOUR_API_KEY # Change it to your actual Calendarific API KEY
 GOOGLE_SEARCH_API_KEY=YOUR_GOOGLE_KEY # Your google search API KEY
 GOOGLE_SEARCH_CX=YOUR_CSE_ID # Your google search CSEID
 ```
@@ -80,9 +82,10 @@ GOOGLE_SEARCH_CX=YOUR_CSE_ID # Your google search CSEID
 - `LATITUDE` and `LONGITUDE`: The geographic coordinates for which you want weather updates.
 - `GOOGLE_SEARCH_API_KEY`: Your API Key from [GoogleCustomSearch](https://developers.google.com/custom-search/v1/overview)
 - `GOOGLE_SEARCH_CX`: Your API Key from [GoogleCustomSearchEngine](https://developers.google.com/custom-search/v1/overview)
+- `CALENDARIFIC_API_KEY`: Your API Key from [Calendarific](https://calendarific.com/).
 
-### 4. Customize Lyra.js **(Optional)**:
-- You can change `USER_NAME` to the name of the user Lyra will interact with (default: 'Arash').
+### 4. Customize Lyra **(Optional)**:
+- You can change `USER_NAME` to the name of the user Lyra will interact with (default: 'Arash') in [config.js](./config/config.js). 
 - `Adjust MOOD_TIMEOUT_MS` to change how long Lyra's mood lasts before resetting to 'NORMAL' (default: 2 days).
 - `Modify SLEEP_START_HOUR` and `SLEEP_END_HOUR` to set Lyra's sleep schedule (default: 00:00 - 04:00).
 - `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` control the rate limiting behavior.
@@ -108,6 +111,7 @@ node index.js
     - /shownotes: Show personal notes.
     - /search query: Search for info on Google.
     - /help: Show lists of commands.
+    - /hariini: today's information.
     - /author: Information about creators.
 
 - **Scheduled Messages**: If `TARGET_CHAT_ID` is configured, Lyra will automatically send:
@@ -125,22 +129,6 @@ To deploy Lyra on a live system, you would typically use a process manager like 
 - Development: Run directly via **node index.js.**
 
 
-## 📂 Directory Structure
-```bash
-Lyra-chatbot/
-├── config/
-│   └── config.js          # Manual config (if not using .env)
-├── utils/
-│   ├── sendMessage.js     # Telegram message sending
-│   ├── timeHelper.js      # Jakarta time format
-│   └── commandHelper.js   # Reminder, Note, Search
-├── data/
-│   ├── reminders.json     # Reminder storage
-│   └── notes.json         # Note storage
-├── Lyra.js             # Core LyraBot logic
-├── index.js               # Bot entry point
-└── README.md              # This documentation
-```
 
 ## 🙏 Thank you
 **For those** of you who have strayed into this repo.
