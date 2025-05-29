@@ -2,11 +2,14 @@
 
 const sendMessage = require('../utils/sendMessage'); // Utilities for sending messages
 const commandHelper = require('./commandLists'); // Utilities for commands
-const { generateAIResponse, USER_NAME } = require('../core/core')
+const { generateAIResponse } = require('../core/core')
+const config = require('../config/config')
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weather'); // Weather utility
+const holidaysModule = require('./holidays')
 
 // 🌸 Lyra Configuration 
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
+const USER_NAME = config.USER_NAME;
 
 // Mood Definitions
 const Mood = {
@@ -161,7 +164,7 @@ const commandHandlers = [
         })
     },
     {
-        pattern: /(terima kasih|makasih)/i,
+        pattern: /^(terima kasih|makasih|makasih ya)/i,
         response: () => ({
             text: `Sama-sama, ${USER_NAME}! Lyra senang bisa membantu. ${Mood.HAPPY.emoji}`,
             mood: Mood.HAPPY
@@ -284,7 +287,7 @@ const commandHandlers = [
     },
     // Perintah baru: Search
     {
-        pattern: /^\/search\s+(.+)$/i, // Pola RegEx 
+        pattern: /^\/search\s+(.+)$/i, 
         response: async (chatId, msg) => { 
             try {
                 // Ekstrak kueri pencarian dari pesan menggunakan pola RegEx
@@ -339,6 +342,28 @@ const commandHandlers = [
         }
     }
 ];    
+
+if (config.calendarificApiKey) {
+    commandHandlers.push({
+        pattern: /^\/(hariini|liburhariini|infohari)$/i, 
+        response: async (chatId, msg) => { 
+            await lyraTyping(chatId); 
+
+            const holidayMessage = await holidaysModule.getFormattedTodaysHolidays(
+                config.calendarificApiKey,
+                'ID', // Ganti 'ID' dengan kode negara yang diinginkan jika perlu
+                config.USER_NAME // Mengambil USER_NAME dari config untuk personalisasi
+            );
+            
+            // Berdasarkan struktur commandHandlers di core.js yang Anda berikan,
+            // handler harus mengembalikan objek dengan properti 'text'.
+            return { text: holidayMessage }; 
+        }
+    });
+    console.log('[Commands] Perintah /hariini untuk info hari libur telah diaktifkan.');
+} else {
+    console.warn('[Commands] Calendarific API Key tidak ditemukan di config.js. Perintah /hariini (info hari libur) dinonaktifkan.');
+}
 
 
 /**

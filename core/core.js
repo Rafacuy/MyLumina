@@ -16,9 +16,10 @@ const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu s
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
 const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, lyraTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
+const holidaysModule = require('../modules/holidays')
 
 // 🌸 Lyra Configurations
-const USER_NAME = 'Arash'; // Nama pengguna yang berinteraksi dengan Lyra 
+const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Lyra 
 const OPEN_ROUTER_API_KEY = config.openRouterApiKey; // API Key untuk OpenRouter AI
 const OPEN_ROUTER_MODEL = config.openRouterModel; // Model AI
 const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
@@ -39,7 +40,7 @@ const PrayerTimes = {
     Isya: { hour: 19, minute: 0, emoji: '🌌' }
 };
 
-// Variabel State Global
+// Grobal State Variables
 let conversationHistory = []; // Menyimpan riwayat percakapan lengkap untuk persistensi
 let messageCache = new Map(); // Mengcache respons AI untuk menghindari panggilan API berlebihan untuk prompt yang identik
 let userRequestCounts = new Map(); // Melacak jumlah permintaan untuk pembatasan laju per pengguna
@@ -289,7 +290,7 @@ module.exports = {
         setBotInstance(bot); // Tetapkan instance bot yang diteruskan ke moodHelper
         const configuredChatId = config.TARGET_CHAT_ID || config.chatId; // Tentukan ID obrolan target untuk pesan terjadwal
 
-        console.log(`🌸 LyraBot v2.0 (Asisten Virtual) aktif untuk ${USER_NAME}!`);
+        console.log(`🌸 LyraBot v5.1 (Asisten Virtual) aktif untuk ${USER_NAME}!`);
         if (configuredChatId) {
             console.log(`📬 Pesan terjadwal (Waktu Sholat, Cuaca, Lagu Sedih) akan dikirim ke ID obrolan: ${configuredChatId}`);
         } else {
@@ -381,6 +382,27 @@ module.exports = {
             schedule.scheduleJob({ rule: '0 * * * *', tz: 'Asia/Jakarta' }, () => {
                 updateTimeBasedModes(configuredChatId);
             });
+            if (config.calendarificApiKey && config.TARGET_CHAT_ID) {
+                schedule.scheduleJob({ rule: '0 7 * * *', tz: 'Asia/Jakarta' }, async () => {
+                    console.log('[Core] Menjalankan pemeriksaan hari libur harian...');
+                    await holidaysModule.checkAndNotifyDailyHolidays(
+                        config.calendarificApiKey,
+                        'ID', // Kode negara, contoh 'ID' untuk Indonesia
+                        (message) => {
+                            
+                            sendMessage(config.TARGET_CHAT_ID, message);
+                        }
+                    );
+                });
+                console.log(`[Core] Pemeriksaan hari libur harian dijadwalkan setiap pukul 07:00 untuk chat ID: ${config.TARGET_CHAT_ID}`);
+            } else {
+                if (!config.calendarificApiKey) {
+                    console.warn('[Core] Calendarific API Key tidak ditemukan di config.js. Pemeriksaan hari libur dinonaktifkan.');
+                }
+                if (!config.TARGET_CHAT_ID) {
+                    console.warn('[Core] TARGET_CHAT_ID tidak ditemukan di config.js. Notifikasi hari libur tidak dapat dikirim.');
+                }
+            };
             // Jalankan sekali saat startup untuk mengatur mode/mood awal berdasarkan waktu saat ini
             updateTimeBasedModes(configuredChatId);
         }
