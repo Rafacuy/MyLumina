@@ -3,10 +3,10 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 const config = require('./config/config');
-const { initLyrabot, generateAIResponse } = require('./Lyra');
-const moodHelper = require('./utils/moodHelper');
+const { initLyrabot, generateAIResponse } = require('./core/core');
+const command = require('./modules/commandHandlers');
 
-moodHelper.setAISummarizer(generateAIResponse); 
+command.setAISummarizer(generateAIResponse); 
 
 const bot = new TelegramBot(config.telegramBotToken, { polling: true });
 

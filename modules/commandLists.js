@@ -1,14 +1,12 @@
-// commandHelper.js
-// File ini berisi fungsi helper untuk berbagai perintah bot seperti pengingat, catatan, dan pencarian.
-// VERSI DITINGKATKAN: Dengan fallback error yang lebih baik dan ringkasan AI untuk pencarian.
+// commandLists.js
 
 const fs = require('fs').promises; // Untuk operasi sistem file (membaca/menulis JSON)
 const schedule = require('node-schedule'); // Untuk menjadwalkan pengingat
 const axios = require('axios'); // Untuk membuat permintaan HTTP ke API
 const config = require('../config/config'); // File konfigurasi untuk kunci API dan pengaturan lainnya
-const sendMessage = require('./sendMessage'); // Utilitas untuk mengirim pesan (pastikan ada dan tangguh)
-const { formatJakartaDateTime, formatJakartaTime, getJakartaMoment } = require('./timeHelper'); // Utilitas untuk waktu Jakarta (pastikan ada dan tangguh)
-const { generateAIResponse } = require('../Lyra');
+const sendMessage = require('../utils/sendMessage'); // Utilitas untuk mengirim pesan (pastikan ada dan tangguh)
+const { formatJakartaDateTime, formatJakartaTime, getJakartaMoment } = require('../utils/timeHelper'); // Utilitas untuk waktu Jakarta (pastikan ada dan tangguh)
+const { generateAIResponse } = require('../core/core');
 
 const REMINDERS_FILE = './data/reminders.json'; // Path ke file JSON pengingat
 const NOTES_FILE = './data/notes.json'; // Path ke file JSON catatan

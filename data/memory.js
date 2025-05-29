@@ -1,4 +1,4 @@
-// memory.js
+// data/memory.js
 // Memory.js Update (Optimized)
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
