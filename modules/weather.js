@@ -1,8 +1,9 @@
-// utils/weatherHelper.js
+// modules/weather.js
+
 const axios = require('axios').default;
 const config = require('../config/config'); 
-const { Mood } = require('./moodHelper'); // Mood dari moodHelper
-const lyra = require('../Lyra')
+const { Mood } = require('./commandHandlers'); 
+const lyra = require('../core/core')
 const USER_NAME = lyra.USER_NAME || 'Tuan'; 
 
 /**

@@ -1,9 +1,9 @@
-// moodHelper.js
+// modules/commandHandlers.js
 
-const sendMessage = require('./sendMessage'); // Utilities for sending messages
-const commandHelper = require('./commandHelper'); // Utilities for commands
-const { generateAIResponse, USER_NAME } = require('../Lyra')
-const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weatherHelper'); // Weather utility
+const sendMessage = require('../utils/sendMessage'); // Utilities for sending messages
+const commandHelper = require('./commandLists'); // Utilities for commands
+const { generateAIResponse, USER_NAME } = require('../core/core')
+const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weather'); // Weather utility
 
 // 🌸 Lyra Configuration 
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
