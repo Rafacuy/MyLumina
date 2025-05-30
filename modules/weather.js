@@ -2,9 +2,8 @@
 
 const axios = require('axios').default;
 const config = require('../config/config'); 
-const { Mood } = require('./commandHandlers'); 
-const lyra = require('../core/core')
-const USER_NAME = lyra.USER_NAME || 'Tuan'; 
+const Mood  = require('./mood'); 
+const USER_NAME = config.USER_NAME || 'Tuan'; 
 
 /**
  * format data cuaca mentah jadi string yang mudah dibaca pengguna.
@@ -37,16 +36,17 @@ const getWeatherReminder = (weatherData) => {
     const description = weatherData.weather[0].description; // Deskripsi cuaca
 
     const reminders = {
-        Rain: `Hujan-hujan gini ${USER_NAME} jangan lupa payung! ${Mood.SAD.emoji}`,
+        Rain: `Hujan-hujan gini, Tuan ${USER_NAME} jangan lupa payung! ${Mood.SAD.emoji}`,
         Clear: `Cuacanya cerah~, cocok buat produktivitas nih, ${USER_NAME}! ${Mood.HAPPY.emoji}`,
         Clouds: `Awan mendung nih, siapa tau hujan~ ${Mood.NORMAL.emoji}`,
         Thunderstorm: `Ada petir! Cepetan masuk rumah ${USER_NAME}! ${Mood.SAD.emoji}`,
         Snow: `Wah, ada salju! Pakai baju yang tebal ya, ${USER_NAME}! ${Mood.HAPPY.emoji}`,
-        Drizzle: `Gerimis nih ${USER_NAME}, hati-hati ya! ${Mood.NORMAL.emoji}`
+        Drizzle: `Gerimis nih Tuan, hati-hati ya! ${Mood.NORMAL.emoji}`
     };
 
-    // Mengembalikan pengingat spesifik jika ditemukan kecocokan, jika tidak, pengingat umum berdasarkan mood saat ini
-    return reminders[weatherMain] || `Cuaca hari ini ${description}, ${Mood.NORMAL.emoji}`; // Menggunakan Mood.NORMAL sebagai fallback
+    // Fallback
+    const weatherKey = reminders[weatherMain] ? weatherMain : 'Normal';
+    return reminders[weatherKey] || `Cuaca hari ini ${description}, ${Mood.NORMAL.emoji}`; 
 };
 
 /**

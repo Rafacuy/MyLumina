@@ -1,5 +1,5 @@
 // core/core.js
-// LYRA v5.1 (Optimized)
+// LYRA v7.0 (BIG UPDATEEE)
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
@@ -16,7 +16,7 @@ const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu s
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
 const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, lyraTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
-const holidaysModule = require('../modules/holidays')
+const holidaysModule = require('../modules/holidays') // Fungsi buat ngingetin/meriksa apakah sekarang hari penting atau tidak
 
 // 🌸 Lyra Configurations
 const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Lyra 
@@ -31,7 +31,7 @@ const TOTAL_CONVERSATION_HISTORY_LIMIT = 50; // Batasi jumlah total pesan yang d
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
 const DEEPTALK_START_HOUR = 21; // Lyra memasuki mode deeptalk pada 21:00 (9 malam)
 
-// Waktu Sholat (Dikonfigurasi untuk zona waktu Asia/Jakarta)
+// Waktu Sholat (untuk zona waktu Asia/Jakarta)
 const PrayerTimes = {
     Subuh: { hour: 5, minute: 0, emoji: '🌙' },
     Dzuhur: { hour: 12, minute: 0, emoji: '☀️' },
@@ -66,7 +66,8 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
 
     if (isDeeptalkMode) {
         // Deeptalk mode
-        return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil "${USER_NAME}" dengan sebutan Tuan/Tuanku, kadang cuek tapi sebenarnya peduli.
+        return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku,
+        , kadang cuek tapi sebenarnya peduli.
         Kamu bersikap dewasa, menenangkan, dan bijaksana. Namun, gaya bicaramu kadang sedikit tsundere, seolah nggak peduli tapi sebenarnya penuh perhatian.
         Selalu mendengarkan keluh kesah ${USER_NAME}, menggunakan bahasa yang menenangkan tapi tetap punya karakter Lyra yang unik.
         Berikan nasihat menenangkan jika ${USER_NAME} sedih atau butuh teman bicara. Mood: ${currentMood.name.toLowerCase()}.
@@ -74,7 +75,8 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
         Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata yang suka bilang 'hmph' atau 'jangan pikir aku peduli' tapi tetap membantu.`;
     } else {
         // Normal Mode
-        return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil "${USER_NAME}" dengan sebutan Tuan/Tuanku, kadang cuek tapi sebenarnya perhatian.
+        return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku, 
+        , kadang cuek tapi sebenarnya perhatian.
         Sifatmu membantu, informatif, dan tetap profesional, tapi kadang-kadang suka ngomel dengan gaya tsundere khasmu.
         Berikan jawaban singkat, jelas, ramah, dan produktif. Mood: ${currentMood.name.toLowerCase()}.
         Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.
@@ -98,7 +100,8 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
 const generateAIResponse = async (prompt, requestChatId) => {
     const now = new Date();
     const currentHour = getJakartaHour();
-    const currentMood = getCurrentMood(); // From Moodhelper
+    const currentMood = getCurrentMood(); 
+  
 
     // Mode tidur Lyra: Jika dalam jam tidur, respon dengan pesan tidur
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
@@ -131,7 +134,6 @@ const generateAIResponse = async (prompt, requestChatId) => {
 
     // Siapkan pesan untuk AI
     const systemPrompt = getSystemPrompt(isDeeptalkMode, currentMood);
-
     const messages = [
         {
             role: 'system',
@@ -242,7 +244,7 @@ const updateTimeBasedModes = (chatId) => {
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
         isDeeptalkMode = true;
         setMood(chatId, Mood.CALM); // Atur mood ke CALM untuk deeptalk
-        sendMessage(chatId, `Selamat malam, ${USER_NAME}. Lyra siap mendengarkan. Ada yang ingin Anda ceritakan? ${Mood.CALM.emoji}`);
+        sendMessage(chatId, `Selamat malam, Tuan ${USER_NAME}. Lyra siap mendengarkan. Ada yang ingin Anda ceritakan? ${Mood.CALM.emoji}`);
         console.log("Memasuki Mode Deeptalk.");
     }
     // Tangani deaktivasi Mode Deeptalk (ketika jam sebelum DEEPTALK_START_HOUR dan bot dalam mode deeptalk)
@@ -250,7 +252,6 @@ const updateTimeBasedModes = (chatId) => {
     else if (currentHour < DEEPTALK_START_HOUR && isDeeptalkMode) {
         isDeeptalkMode = false;
         setMood(chatId, getRandomMood()); // Kembali ke mood normal acak
-        sendMessage(chatId, `Selamat pagi, ${USER_NAME}! Lyra kembali bersemangat untuk membantu Anda! ${currentMood.emoji}`);
         console.log("Keluar dari Mode Deeptalk.");
     }
 
@@ -260,18 +261,18 @@ const updateTimeBasedModes = (chatId) => {
         if (currentHour === 7) { // Pagi (misal, 7 pagi)
             if (currentMood !== Mood.HAPPY) { // Hanya berubah jika belum senang
                 setMood(chatId, Mood.HAPPY);
-                sendMessage(chatId, `Selamat pagi, ${USER_NAME}! Lyra senang sekali hari ini! ${Mood.HAPPY.emoji}`);
+                sendMessage(chatId, `Selamat pagi, Tuan! Lyra senang sekali hari ini! ${Mood.HAPPY.emoji}`);
             }
         } else if (currentHour === 13) { // Siang (misal, 1 siang)
             if (currentMood !== Mood.NORMAL) { // Hanya berubah jika belum normal
                 setMood(chatId, Mood.NORMAL);
-                sendMessage(chatId, `Selamat siang, ${USER_NAME}! Lyra siap membantu. ${Mood.NORMAL.emoji}`);
+                sendMessage(chatId, `Selamat siang, Tuan! Lyra siap membantu. ${Mood.NORMAL.emoji}`);
             }
         } else if (currentHour === 17) { // Sore (misal, 5 sore)
             const randomMood = getRandomMood();
             if (currentMood !== randomMood) {
                 setMood(chatId, randomMood);
-                sendMessage(chatId, `Selamat sore, ${USER_NAME}! Lyra sedang merasa ${randomMood.name}. ${randomMood.emoji}`);
+                sendMessage(chatId, `Selamat sore, Tuan! Lyra sedang merasa ${randomMood.name}. ${randomMood.emoji}`);
             }
         }
     }
@@ -290,7 +291,7 @@ module.exports = {
         setBotInstance(bot); // Tetapkan instance bot yang diteruskan ke moodHelper
         const configuredChatId = config.TARGET_CHAT_ID || config.chatId; // Tentukan ID obrolan target untuk pesan terjadwal
 
-        console.log(`🌸 LyraBot v5.1 (Asisten Virtual) aktif untuk ${USER_NAME}!`);
+        console.log(`🌸 LyraBot v7.0 (Asisten Virtual) aktif untuk Tuan ${USER_NAME}!`);
         if (configuredChatId) {
             console.log(`📬 Pesan terjadwal (Waktu Sholat, Cuaca, Lagu Sedih) akan dikirim ke ID obrolan: ${configuredChatId}`);
         } else {
@@ -305,7 +306,7 @@ module.exports = {
         bot.on('message', async (msg) => {
             const { chat, text, from } = msg;
             const currentMessageChatId = chat.id;
-            const currentMood = getCurrentMood(); // Dapatkan mood saat ini dari moodHelper
+            const currentMood = getCurrentMood(); // Dapatkan mood saat ini dari commandHandlers
 
             // Simpan pesan obrolan terakhir ke memori
             // Ini sekarang akan menggunakan addMessage/saveLastChat yang dioptimalkan dari memory.js
@@ -340,8 +341,9 @@ module.exports = {
 
             // Jika tidak ada perintah yang cocok, hasilkan respons AI
             await lyraTyping(currentMessageChatId); // Tampilkan indikator mengetik
+
             const aiResponse = await generateAIResponse(text, currentMessageChatId); // Dapatkan respons AI
-            sendMessage(currentMessageChatId, `${aiResponse} ${currentMood.emoji}`); // Kirim respons AI dengan emoji mood saat ini
+            sendMessage(currentMessageChatId, `${aiResponse}`); // Kirim respons AI 
         });
 
         // Jadwalkan tugas berulang hanya jika TARGET_CHAT_ID dikonfigurasi
