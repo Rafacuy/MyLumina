@@ -2,25 +2,14 @@
 
 const sendMessage = require('../utils/sendMessage'); // Utilities for sending messages
 const commandHelper = require('./commandLists'); // Utilities for commands
-const { generateAIResponse } = require('../core/core')
-const config = require('../config/config')
+const config = require('../config/config'); // Configuration File
+const Mood = require('./mood');
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weather'); // Weather utility
-const holidaysModule = require('./holidays')
+const holidaysModule = require('./holidays');
 
 // 🌸 Lyra Configuration 
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
 const USER_NAME = config.USER_NAME;
-
-// Mood Definitions
-const Mood = {
-    HAPPY: { emoji: '>.<', name: 'Senang' },
-    SAD: { emoji: ':)', name: 'Sedih' },
-    ANGRY: { emoji: '😠', name: 'Marah' },
-    LAZY: { emoji: '😪', name: 'Malas' },
-    LOVING: { emoji: '>///<', name: 'Penuh Kasih' },
-    NORMAL: { emoji: '>~<', name: 'Normal' },
-    CALM: { emoji: '😌', name: 'Tenang' },
-};
 
 // Global State Variables
 let currentMood = Mood.NORMAL; // Mood Lyra saat ini
@@ -210,7 +199,7 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /(lagu sedih|rekomendasi lagu sedih|rekomendasi lagu sad|lagu sad)/i,
+        pattern: /^(lagu sedih|rekomendasi lagu sedih|rekomendasi lagu sad|lagu sad)/i,
         response: async (chatId) => {
             await sendSadSongNotification(chatId);
             return {

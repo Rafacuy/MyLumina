@@ -1,7 +1,7 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 🌸 LyraBot v6.0 – Productive Assistant
+# 🌸 LyraBot v6.1 (Optimized) – Productive Assistant
 
 > Telegram ChatBot smart, and act as your assistant.  
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)  
@@ -9,7 +9,7 @@
 
 ---
 
-## ✨ What's New in v4.0?
+## ✨ What's New in v6.1?
 
 -  **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
 - 💾 **Ring Buffer + Archival**: History auto-archive, no RAM overload
@@ -18,6 +18,7 @@
 - 💬 **Custom Command Additions**: More interactive commands (reminder, note, search)
 - 🌐 **Improved Web Search**: Now supports Google Custom Search with your API key
 - **Holidays Information**: Notifying important days / day information
+- **Fixed Bugs & Errors**: Now it has been optimized for user convenience.
 
 ---
 
@@ -97,14 +98,15 @@ Once the bot is running, you can interact with Lyra in your Telegram chat.
 
 ```bash
 # To start the Lyra bot
-node index.js
+npm start
 ```
+
 
 - **General Chat**: Send any message to Lyra, and she will respond based on her AI model, personality, and current mood.
 - **Predefined Commands**: Lyra has specific responses for certain phrases:
     - `hai, halo, bot, helo, haii, woy, hoy`: Lyra will greet you happily.
     - `terima kasih, makasih`: Lyra will express happiness to have helped.
-    - `siapa kamu, kamu siapa`: Lyra will introduce herself as your girlfriend.
+    - `siapa kamu, kamu siapa`: Lyra will introduce herself.
     - `lagi apa, lagi ngapain, ngapain`: Lyra will give a loving response about thinking of you.
     - /reminder HH:MM (Message): Set reminder.
     - /note pesan: Save notes.
