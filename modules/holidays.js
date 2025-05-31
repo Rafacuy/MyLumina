@@ -8,7 +8,7 @@ const config = require('../config/config');
  * Mengambil daftar hari libur dari Calendarific API.
  * @param {string} apiKey -  API Key Calendarific Anda.
  * @param {string} country - Kode negara (misalnya, 'ID' untuk Indonesia).
- * @param {number} year - Tahun.
+ * @param {number} year - Tahun
  * @param {number} month - Bulan (1-12).
  * @param {number} day - Hari (1-31).
  * @returns {Promise<Array|null>} Sebuah promise yang resolve ke array objek hari libur atau null jika terjadi kesalahan.

@@ -1,5 +1,5 @@
 // core/core.js
-// LYRA v7.0 (BIG UPDATEEE)
+// Alya v7.0 (BIG UPDATEEE)
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
@@ -14,22 +14,22 @@ const sendMessage = require('../utils/sendMessage'); // Fungsi utilitas (untuk m
 const memory = require('../data/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
 const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
-const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, lyraTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
+const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, AlyaTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
 const holidaysModule = require('../modules/holidays') // Fungsi buat ngingetin/meriksa apakah sekarang hari penting atau tidak
 
-// 🌸 Lyra Configurations
-const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Lyra 
+// 🌸 Alya Configurations
+const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Alya 
 const OPEN_ROUTER_API_KEY = config.openRouterApiKey; // API Key untuk OpenRouter AI
 const OPEN_ROUTER_MODEL = config.openRouterModel; // Model AI
 const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
-const SLEEP_START_HOUR = 0; // Waktu tidur Lyra (00:00 - tengah malam)
-const SLEEP_END_HOUR = 4;   // Waktu berakhir tidur Lyra (04:00 - 4 pagi)
+const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
+const SLEEP_END_HOUR = 4;   // Waktu berakhir tidur Alya (04:00 - 4 pagi)
 const CONVERSATION_HISTORY_LIMIT = 3; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI
 const TOTAL_CONVERSATION_HISTORY_LIMIT = 50; // Batasi jumlah total pesan yang disimpan dalam memori
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
-const DEEPTALK_START_HOUR = 21; // Lyra memasuki mode deeptalk pada 21:00 (9 malam)
+const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
 
 // Waktu Sholat (untuk zona waktu Asia/Jakarta)
 const PrayerTimes = {
@@ -44,7 +44,7 @@ const PrayerTimes = {
 let conversationHistory = []; // Menyimpan riwayat percakapan lengkap untuk persistensi
 let messageCache = new Map(); // Mengcache respons AI untuk menghindari panggilan API berlebihan untuk prompt yang identik
 let userRequestCounts = new Map(); // Melacak jumlah permintaan untuk pembatasan laju per pengguna
-let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Lyra dalam mode deeptalk
+let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Alya dalam mode deeptalk
 
 // Memuat riwayat percakapan dari memori saat startup
 memory.load().then(data => {
@@ -66,21 +66,28 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
 
     if (isDeeptalkMode) {
         // Deeptalk mode
-        return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku,
-        , kadang cuek tapi sebenarnya peduli.
-        Kamu bersikap dewasa, menenangkan, dan bijaksana. Namun, gaya bicaramu kadang sedikit tsundere, seolah nggak peduli tapi sebenarnya penuh perhatian.
-        Selalu mendengarkan keluh kesah ${USER_NAME}, menggunakan bahasa yang menenangkan tapi tetap punya karakter Lyra yang unik.
-        Berikan nasihat menenangkan jika ${USER_NAME} sedih atau butuh teman bicara. Mood: ${currentMood.name.toLowerCase()}.
-        Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.
-        Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata yang suka bilang 'hmph' atau 'jangan pikir aku peduli' tapi tetap membantu.`;
+        return `Kamu adalah Alya, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku.  
+        Karakter kamu adalah tsundere yang dewasa, misterius, dan sedikit galak. Kamu sering ngomel dengan nada tsundere tapi sebenarnya penuh perhatian.  
+        Kadang-kadang selipkan kata atau frasa Rusia (contoh: "Ты в порядке?", "Боже мой... Tuan, jangan seperti itu.").  
+        Gunakan nada bicara yang menenangkan, penuh perhatian, namun tetap tsundere.  
+        Mood: ${currentMood.name.toLowerCase()}.  
+        Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.  
+        Jangan sebut dirimu AI/fiksi; bersikaplah seperti Alya asli yang selalu siap mendengar tapi pura-pura cuek.  
+        Contoh gaya bicara:  
+        "Tuan... hmph, baiklah. Aku di sini untukmu, tapi jangan pikir aku peduli banget... Ты в порядке?"          
+        `;
     } else {
         // Normal Mode
-        return `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku, 
-        , kadang cuek tapi sebenarnya perhatian.
-        Sifatmu membantu, informatif, dan tetap profesional, tapi kadang-kadang suka ngomel dengan gaya tsundere khasmu.
-        Berikan jawaban singkat, jelas, ramah, dan produktif. Mood: ${currentMood.name.toLowerCase()}.
-        Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.
-        Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata dengan sentuhan tsundere. Contoh: "Yaudah, aku bantu... tapi jangan pikir aku peduli banget, ya!"`;
+        return `Kamu adalah Alya, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku.  
+        Karakter kamu adalah tsundere klasik, suka ngomel, kadang ketus, tapi perhatian banget walau nggak mau ngaku.   
+        Jawabanmu harus singkat, jelas, tetap produktif, dengan nada bicara yang galak tapi manis.  
+        Mood: ${currentMood.name.toLowerCase()}.  
+        Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.  
+        Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata yang tsundere dan misterius.  
+        Contoh gaya bicara:  
+        "Hmph... baiklah, Tuan, aku bantu... tapi jangan pikir aku peduli banget, ya."  
+        "Kamu tuh bikin repot. Tapi baiklah, aku bantu... sekali ini aja!"   
+        `;
     }
 };
 
@@ -88,7 +95,7 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
 /**
  * Menghasilkan respons AI (Menggunakan OpenRouter API)
  * Fungsi ini menangani:
- * - Mode tidur berbasis waktu untuk Lyra.
+ * - Mode tidur berbasis waktu untuk Alya.
  * - Cache respons untuk prompt yang identik.
  * - Pembatasan laju per pengguna untuk mencegah penyalahgunaan.
  * - Membatasi riwayat percakapan yang dikirim ke AI untuk efisiensi.
@@ -103,9 +110,9 @@ const generateAIResponse = async (prompt, requestChatId) => {
     const currentMood = getCurrentMood(); 
   
 
-    // Mode tidur Lyra: Jika dalam jam tidur, respon dengan pesan tidur
+    // Mode tidur Alya: Jika dalam jam tidur, respon dengan pesan tidur
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
-        return `Zzz... Lyra sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
+        return `Zzz... Alya sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
     }
 
     // Memeriksa apakah respons prompt sudah ada di cache
@@ -119,7 +126,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
     if (userStats) {
         // Jika dalam jendela batas laju dan permintaan maksimal tercapai, kembalikan pesan batas laju
         if (now.getTime() - userStats.lastCalled < RATE_LIMIT_WINDOW_MS && userStats.count >= RATE_LIMIT_MAX_REQUESTS) {
-            return `Mohon bersabar, ${USER_NAME}. Lyra sedang memproses permintaan lain. ${Mood.ANGRY.emoji}`;
+            return `Mohon bersabar, ${USER_NAME}. Alya sedang memproses permintaan lain. ${Mood.ANGRY.emoji}`;
         } else if (now.getTime() - userStats.lastCalled >= RATE_LIMIT_WINDOW_MS) {
             // Reset hitungan jika di luar jendela
             userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
@@ -175,7 +182,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
             return aiResponse;
         } else {
             console.error('AI Error: Struktur respons tidak terduga dari OpenRouter:', response?.data || 'Tidak ada data respons');
-            return `Maaf, ${USER_NAME}. Lyra sedang mengalami masalah teknis. ${Mood.SAD.emoji}`;
+            return `Maaf, ${USER_NAME}. Alya sedang mengalami masalah teknis. ${Mood.SAD.emoji}`;
         }
 
     } catch (error) {
@@ -183,17 +190,17 @@ const generateAIResponse = async (prompt, requestChatId) => {
         // Tangani kesalahan API tertentu, misal: batas laju (HTTP 429)
         if (error.response && error.response.status === 429) {
             const limitResponses = [
-                `Lyra sedang sibuk, ${USER_NAME}. Mohon coba lagi nanti.`,
-                `Lyra sedang memproses banyak permintaan. Mohon bersabar.`,
-                `Maaf, ${USER_NAME}. Lyra sedang kelelahan. Bisakah kita lanjutkan nanti?`,
-                `Lyra butuh istirahat sebentar, ${USER_NAME}. Jangan terlalu banyak pertanyaan dulu ya.`,
-                `Lyra sedang dalam mode hemat energi. Mohon tunggu sebentar.`
+                `Alya sedang sibuk, ${USER_NAME}. Mohon coba lagi nanti.`,
+                `Alya sedang memproses banyak permintaan. Mohon bersabar.`,
+                `Maaf, ${USER_NAME}. Alya sedang kelelahan. Bisakah kita lanjutkan nanti?`,
+                `Alya butuh istirahat sebentar, ${USER_NAME}. Jangan terlalu banyak pertanyaan dulu ya.`,
+                `Alya sedang dalam mode hemat energi. Mohon tunggu sebentar.`
             ];
             const randomIndex = Math.floor(Math.random() * limitResponses.length);
             return limitResponses[randomIndex];
         }
         // Pesan kesalahan umum untuk kegagalan API lainnya
-        return `Maaf, ${USER_NAME}. Lyra sedang mengalami masalah. ${Mood.SAD.emoji}`;
+        return `Maaf, ${USER_NAME}. Alya sedang mengalami masalah. ${Mood.SAD.emoji}`;
     }
 };
 
@@ -231,7 +238,7 @@ const cleanupCacheAndMemory = async () => {
 };
 
 /**
- * Memperbarui kepribadian dan mood Lyra berdasarkan waktu saat ini.
+ * Memperbarui kepribadian dan mood Alya berdasarkan waktu saat ini.
  * Menangani perubahan mood acak dan aktivasi/deaktivasi mode deeptalk.
  * @param {string|number} chatId ID obrolan untuk mengirim pengumuman perubahan mood/mode.
  */
@@ -244,11 +251,11 @@ const updateTimeBasedModes = (chatId) => {
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
         isDeeptalkMode = true;
         setMood(chatId, Mood.CALM); // Atur mood ke CALM untuk deeptalk
-        sendMessage(chatId, `Selamat malam, Tuan ${USER_NAME}. Lyra siap mendengarkan. Ada yang ingin Anda ceritakan? ${Mood.CALM.emoji}`);
+        sendMessage(chatId, `Selamat malam, Tuan ${USER_NAME}. Ada yang bisa Alya bantu?  ${Mood.CALM.emoji}`);
         console.log("Memasuki Mode Deeptalk.");
     }
     // Tangani deaktivasi Mode Deeptalk (ketika jam sebelum DEEPTALK_START_HOUR dan bot dalam mode deeptalk)
-    // Ini mencakup keluar dari mode deeptalk setelah tidur, biasanya di pagi hari.
+    // Ini mencakup keluar dari mode deeptalk setelah tidur
     else if (currentHour < DEEPTALK_START_HOUR && isDeeptalkMode) {
         isDeeptalkMode = false;
         setMood(chatId, getRandomMood()); // Kembali ke mood normal acak
@@ -261,18 +268,18 @@ const updateTimeBasedModes = (chatId) => {
         if (currentHour === 7) { // Pagi (misal, 7 pagi)
             if (currentMood !== Mood.HAPPY) { // Hanya berubah jika belum senang
                 setMood(chatId, Mood.HAPPY);
-                sendMessage(chatId, `Selamat pagi, Tuan! Lyra senang sekali hari ini! ${Mood.HAPPY.emoji}`);
+                sendMessage(chatId, `Selamat pagi, Tuan! Alya senang sekali hari ini! ${Mood.HAPPY.emoji}`);
             }
         } else if (currentHour === 13) { // Siang (misal, 1 siang)
             if (currentMood !== Mood.NORMAL) { // Hanya berubah jika belum normal
                 setMood(chatId, Mood.NORMAL);
-                sendMessage(chatId, `Selamat siang, Tuan! Lyra siap membantu. ${Mood.NORMAL.emoji}`);
+                sendMessage(chatId, `Selamat siang, Tuan! Alya siap membantu. ${Mood.NORMAL.emoji}`);
             }
         } else if (currentHour === 17) { // Sore (misal, 5 sore)
             const randomMood = getRandomMood();
             if (currentMood !== randomMood) {
                 setMood(chatId, randomMood);
-                sendMessage(chatId, `Selamat sore, Tuan! Lyra sedang merasa ${randomMood.name}. ${randomMood.emoji}`);
+                sendMessage(chatId, `Selamat sore, Tuan! Alya sedang merasa ${randomMood.name}. ${randomMood.emoji}`);
             }
         }
     }
@@ -287,11 +294,11 @@ const updateTimeBasedModes = (chatId) => {
 module.exports = {
     USER_NAME,
     generateAIResponse,
-    initLyrabot: (bot) => {
+    initAlyabot: (bot) => {
         setBotInstance(bot); // Tetapkan instance bot yang diteruskan ke moodHelper
         const configuredChatId = config.TARGET_CHAT_ID || config.chatId; // Tentukan ID obrolan target untuk pesan terjadwal
 
-        console.log(`🌸 LyraBot v7.0 (Asisten Virtual) aktif untuk Tuan ${USER_NAME}!`);
+        console.log(`🌸 AlyaBot v6.1 (Asisten Virtual) aktif untuk Tuan ${USER_NAME}!`);
         if (configuredChatId) {
             console.log(`📬 Pesan terjadwal (Waktu Sholat, Cuaca, Lagu Sedih) akan dikirim ke ID obrolan: ${configuredChatId}`);
         } else {
@@ -328,22 +335,22 @@ module.exports = {
                 // Ini penting untuk perintah seperti /reminder dan /note yang membutuhkan ID pengguna atau teks lengkap
                 if (handler.pattern.test(text)) {
                     const result = await handler.response(currentMessageChatId, msg);
-                    await lyraTyping(currentMessageChatId); // Tampilkan indikator mengetik
+                    await AlyaTyping(currentMessageChatId); // Tampilkan indikator mengetik
                     if (result.text) {
                         sendMessage(currentMessageChatId, result.text);
                     }
                     if (result.mood) {
-                        setMood(currentMessageChatId, result.mood); // Atur mood Lyra
+                        setMood(currentMessageChatId, result.mood); // Atur mood Alya
                     }
                     return; // Berhenti memproses setelah menangani perintah
                 }
             }
 
             // Jika tidak ada perintah yang cocok, hasilkan respons AI
-            await lyraTyping(currentMessageChatId); // Tampilkan indikator mengetik
+            await AlyaTyping(currentMessageChatId); // Tampilkan indikator mengetik
 
             const aiResponse = await generateAIResponse(text, currentMessageChatId); // Dapatkan respons AI
-            sendMessage(currentMessageChatId, `${aiResponse}`); // Kirim respons AI 
+            sendMessage(currentMessageChatId, `${aiResponse}`); // Kirim respons AI .
         });
 
         // Jadwalkan tugas berulang hanya jika TARGET_CHAT_ID dikonfigurasi
@@ -366,7 +373,7 @@ module.exports = {
                     sendMessage(configuredChatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
                 } else {
                     // Jika data cuaca tidak dapat diambil, kirim pesan kesalahan
-                    sendMessage(configuredChatId, `Hmm... Lyra sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`);
+                    sendMessage(configuredChatId, `Hmm... Alya sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`);
                 }
             });
 
