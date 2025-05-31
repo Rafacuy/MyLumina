@@ -1,4 +1,4 @@
 .env
 /data/backups
 /data/archive
-memory.ndjson.gz
+/data/memory.ndjson.gz

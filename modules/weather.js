@@ -12,7 +12,7 @@ const USER_NAME = config.USER_NAME || 'Tuan';
  */
 const getWeatherString = (weatherData) => {
     if (!weatherData?.main || !weatherData?.weather?.length) {
-        return "Maaf, Lyra tidak bisa mendapatkan informasi cuaca saat ini.";
+        return "Maaf, Alya tidak bisa mendapatkan informasi cuaca saat ini.";
     }
     const { temp, feels_like, humidity } = weatherData.main;
     const description = weatherData.weather[0].description;
@@ -30,7 +30,7 @@ const getWeatherString = (weatherData) => {
  */
 const getWeatherReminder = (weatherData) => {
     if (!weatherData?.main || !weatherData?.weather?.length) {
-        return `Maaf, ${USER_NAME}... Lyra lagi pusing nih... ${Mood.SAD.emoji}`;
+        return `Maaf, ${USER_NAME}... Alya lagi pusing nih... ${Mood.SAD.emoji}`;
     }
     const weatherMain = weatherData.weather[0].main; // Kondisi cuaca utama
     const description = weatherData.weather[0].description; // Deskripsi cuaca

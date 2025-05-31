@@ -1,7 +1,7 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 🌸 LyraBot v6.1 (Optimized) – Productive Assistant
+# 🌸 AlyaBot v6.1 (Optimized) – Productive Assistant
 
 > Telegram ChatBot smart, and act as your assistant.  
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)  
@@ -43,17 +43,17 @@
 - **Telegram Bot Token** from [@BotFather](https://t.me/BotFather)
 - **OpenRouter API Key** from [OpenRouter](https://OpenRouter.ai)
 - **OpenWeatherMap API Key** from [OpenWeatherMap](https://openweathermap.org)
-- **Google Custom Search API Key & CSE ID** (Optional)
+- **Google Custom Search API Key & CSE ID** 
 - **Your Telegram Chat ID** for scheduled messages
 
 ### Installation
 
-Follow these steps to get your Lyra bot up and running:
+Follow these steps to get your Alya bot up and running:
 
 ### 1. **Clone the repository**:
 ```
-git clone https://github.com/Rafacuy/Lyra-chatbot.git
-cd Lyra-chatbot
+git clone https://github.com/Rafacuy/Alya-chatbot.git
+cd Alya-chatbot
 ```
 ### 2. **Install dependencies**:
 ```
@@ -78,36 +78,36 @@ GOOGLE_SEARCH_CX=YOUR_CSE_ID # Your google search CSEID
 - `TELEGRAM_BOT_TOKEN`: Your Telegram Bot API token from BotFather.
 - `OPENROUTER_API_KEY`: Your API key from [OpenRouter](https://openrouter.ai)
 - `OPENROUTER_MODEL`: The specific AI model you want to use from OpenRouter (e.g., meta-llama/llama-3.1-8b-instruct).
-- `TARGET_CHAT_ID`: The chat ID where Lyra will send scheduled messages like prayer times and weather updates
+- `TARGET_CHAT_ID`: The chat ID where Alya will send scheduled messages like prayer times and weather updates
 - `WEATHER_API_KEY`: Your API key from [OpenWeatherMap](https://OpenWeatherMap.org)
 - `LATITUDE` and `LONGITUDE`: The geographic coordinates for which you want weather updates.
 - `GOOGLE_SEARCH_API_KEY`: Your API Key from [GoogleCustomSearch](https://developers.google.com/custom-search/v1/overview)
 - `GOOGLE_SEARCH_CX`: Your API Key from [GoogleCustomSearchEngine](https://developers.google.com/custom-search/v1/overview)
 - `CALENDARIFIC_API_KEY`: Your API Key from [Calendarific](https://calendarific.com/).
 
-### 4. Customize Lyra **(Optional)**:
-- You can change `USER_NAME` to the name of the user Lyra will interact with (default: 'Arash') in [config.js](./config/config.js). 
-- `Adjust MOOD_TIMEOUT_MS` to change how long Lyra's mood lasts before resetting to 'NORMAL' (default: 2 days).
-- `Modify SLEEP_START_HOUR` and `SLEEP_END_HOUR` to set Lyra's sleep schedule (default: 00:00 - 04:00).
+### 4. Customize Alya **(Optional)**:
+- You can change `USER_NAME` to the name of the user Alya will interact with (default: 'Arash') in [config.js](./config/config.js). 
+- `Adjust MOOD_TIMEOUT_MS` to change how long Alya's mood lasts before resetting to 'NORMAL' (default: 2 days).
+- `Modify SLEEP_START_HOUR` and `SLEEP_END_HOUR` to set Alya's sleep schedule (default: 00:00 - 04:00).
 - `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` control the rate limiting behavior.
 - `CONVERSATION_HISTORY_LIMIT` defines how many recent messages are sent to the AI for context (default: 3).
 
 ## Usage
 
-Once the bot is running, you can interact with Lyra in your Telegram chat.
+Once the bot is running, you can interact with Alya in your Telegram chat.
 
 ```bash
-# To start the Lyra bot
+# To start the Alya bot
 npm start
 ```
 
 
-- **General Chat**: Send any message to Lyra, and she will respond based on her AI model, personality, and current mood.
-- **Predefined Commands**: Lyra has specific responses for certain phrases:
-    - `hai, halo, bot, helo, haii, woy, hoy`: Lyra will greet you happily.
-    - `terima kasih, makasih`: Lyra will express happiness to have helped.
-    - `siapa kamu, kamu siapa`: Lyra will introduce herself.
-    - `lagi apa, lagi ngapain, ngapain`: Lyra will give a loving response about thinking of you.
+- **General Chat**: Send any message to Alya, and she will respond based on her AI model, personality, and current mood.
+- **Predefined Commands**: Alya has specific responses for certain phrases:
+    - `hai, halo, bot, helo, haii, woy, hoy`: Alya will greet you happily.
+    - `terima kasih, makasih`: Alya will express happiness to have helped.
+    - `siapa kamu, kamu siapa`: Alya will introduce herself.
+    - `lagi apa, lagi ngapain, ngapain`: Alya will give a loving response about thinking of you.
     - /reminder HH:MM (Message): Set reminder.
     - /note pesan: Save notes.
     - /shownotes: Show personal notes.
@@ -116,7 +116,7 @@ npm start
     - /hariini: today's information.
     - /author: Information about creators.
 
-- **Scheduled Messages**: If `TARGET_CHAT_ID` is configured, Lyra will automatically send:
+- **Scheduled Messages**: If `TARGET_CHAT_ID` is configured, Alya will automatically send:
     - Daily prayer time reminders for Subuh, Dzuhur, Ashar, Maghrib, and Isya (Asia/Jakarta timezone).
     - Periodic weather updates and personalized weather-based reminders (every 5 hours).   
     - Sad song recomendations every 10 PM.
@@ -125,7 +125,7 @@ npm start
 
 ### Server
 
-To deploy Lyra on a live system, you would typically use a process manager like PM2 to keep the Node.js application running continuously.
+To deploy Alya on a live system, you would typically use a process manager like PM2 to keep the Node.js application running continuously.
 
 - Live: For a production environment, ensure the bot is running with PM2 or a similar solution to handle restarts and logging.
 - Development: Run directly via **node index.js.**
@@ -137,7 +137,7 @@ To deploy Lyra on a live system, you would typically use a process manager like 
 
 **For those** of you who have ever felt lonely at night.
 
-**Lyra** is ready to be your virtual conversation partner. 🌙💖
+**Alya** is ready to be your virtual conversation partner. 🌙💖
 
 ## 👤 About the Author
 
