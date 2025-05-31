@@ -7,12 +7,12 @@ const Mood = require('./mood');
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weather'); // Weather utility
 const holidaysModule = require('./holidays');
 
-// 🌸 Lyra Configuration 
+// 🌸 Alya Configuration 
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
 const USER_NAME = config.USER_NAME;
 
 // Global State Variables
-let currentMood = Mood.NORMAL; // Mood Lyra saat ini
+let currentMood = Mood.NORMAL; // Mood Alya saat ini
 let moodTimeoutId; // Menyimpan ID timeout reset mood
 let botInstanceRef; // Referensi ke instance bot Telegram
 let globalAISummarizer = null;
@@ -72,7 +72,7 @@ const sadSongs = [
  * @param {string|number} chatId ID obrolan tempat aksi mengetik harus ditampilkan.
  * @param {number} duration Durasi dalam milidetik untuk menampilkan aksi mengetik.
  */
-const lyraTyping = async (chatId, duration = 1500) => {
+const AlyaTyping = async (chatId, duration = 1500) => {
     if (!botInstanceRef) {
         console.warn("Instance bot belum diinisialisasi untuk aksi mengetik. Tidak dapat mengirim indikator mengetik.");
         return;
@@ -81,7 +81,7 @@ const lyraTyping = async (chatId, duration = 1500) => {
         await botInstanceRef.sendChatAction(chatId, 'typing');
         return new Promise(resolve => setTimeout(resolve, duration));
     } catch (error) {
-        console.error(`Error in lyraTyping for chat ID ${chatId}:`, error.message);
+        console.error(`Error in AlyaTyping for chat ID ${chatId}:`, error.message);
     }
 };
 
@@ -104,7 +104,7 @@ const sendSadSongNotification = async (chatId) => {
 };
 
 /**
- * Mengatur mood Lyra dan menjadwalkan reset kembali ke 'NORMAL' setelah durasi tertentu.
+ * Mengatur mood Alya dan menjadwalkan reset kembali ke 'NORMAL' setelah durasi tertentu.
  * Jika mood baru sudah menjadi mood saat ini, tidak ada tindakan yang diambil untuk menghindari pesan berlebihan.
  * Mood seperti 'CALM' (untuk deeptalk) tidak direset secara otomatis.
  * @param {string|number} chatId ID obrolan untuk mengirim pesan status mood.
@@ -118,7 +118,7 @@ const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
     if (currentMood !== newMood) {
         currentMood = newMood;
         if (chatId) {
-            sendMessage(chatId, `Lyra sedang ${newMood.name} ${newMood.emoji}`);
+            sendMessage(chatId, `Alya sedang ${newMood.name} ${newMood.emoji}`);
         }
     }
 
@@ -127,7 +127,7 @@ const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
         moodTimeoutId = setTimeout(() => {
             currentMood = Mood.NORMAL;
             if (chatId) {
-                sendMessage(chatId, `Lyra kembali normal ${Mood.NORMAL.emoji}`);
+                sendMessage(chatId, `Alya kembali normal ${Mood.NORMAL.emoji}`);
             }
         }, durationMs);
     }
@@ -148,42 +148,42 @@ const commandHandlers = [
     {
         pattern: /^(hai|halo|bot|helo|haii|woy|hoy)/i, // Pola regex untuk dicocokkan
         response: () => ({
-            text: `${currentMood.emoji} Hai ${USER_NAME}! Ada yang bisa Lyra bantu? ${currentMood.emoji}`,
+            text: `${currentMood.emoji} Hai ${USER_NAME}! Ada yang bisa Alya bantu? ${currentMood.emoji}`,
             mood: Mood.HAPPY // Mood yang akan diatur setelah perintah ini
         })
     },
     {
         pattern: /^(terima kasih|makasih|makasih ya)/i,
         response: () => ({
-            text: `Sama-sama, ${USER_NAME}! Lyra senang bisa membantu. ${Mood.HAPPY.emoji}`,
+            text: `Sama-sama, ${USER_NAME}! Alya senang bisa membantu. ${Mood.HAPPY.emoji}`,
             mood: Mood.HAPPY
         })
     },
     {
         pattern: /(siapa kamu|kamu siapa)/i,
         response: () => ({
-            text: `Saya Lyra, asisten virtual ${USER_NAME}. Ada yang bisa saya bantu? ${Mood.NORMAL.emoji}`,
+            text: `Saya Alya, asisten virtual ${USER_NAME}. Ada yang bisa saya bantu? ${Mood.NORMAL.emoji}`,
             mood: Mood.NORMAL
         })
     },
     {
         pattern: /(lagi apa|lagi ngapain)/i,
         response: () => ({
-            text: `Lyra sedang siap sedia untuk membantu Anda, Tuan ${USER_NAME}. Ada yang bisa saya lakukan? ${Mood.NORMAL.emoji}`,
+            text: `Alya sedang siap sedia untuk membantu Anda, Tuan ${USER_NAME}. Ada yang bisa saya lakukan? ${Mood.NORMAL.emoji}`,
             mood: Mood.NORMAL
         })
     },
     {
         pattern: /^(mood|suasana hati)/i,
         response: () => ({
-            text: `Mood Lyra saat ini sedang ${currentMood.name} ${currentMood.emoji}`,
+            text: `Mood Alya saat ini sedang ${currentMood.name} ${currentMood.emoji}`,
             mood: currentMood
         })
     },
     {
         pattern: /^(cuaca|info cuaca|cuaca hari ini)/i,
         response: async (chatId) => {
-            await lyraTyping(chatId);
+            await AlyaTyping(chatId);
             const weather = await getWeatherData();
             if (weather) {
                 return {
@@ -192,7 +192,7 @@ const commandHandlers = [
                 };
             } else {
                 return {
-                    text: `Hmm... Lyra sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`,
+                    text: `Hmm... Alya sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`,
                     mood: Mood.SAD
                 };
             }
@@ -237,7 +237,7 @@ const commandHandlers = [
         response: async (chatId) => {
             await sendSadSongNotification(chatId);
             return {
-                text: `Saya mengerti perasaan Anda, Tuan ${USER_NAME}. Lyra di sini untuk mendengarkan. ${Mood.CALM.emoji}`,
+                text: `Saya mengerti perasaan Anda, Tuan ${USER_NAME}. Alya di sini untuk mendengarkan. ${Mood.CALM.emoji}`,
                 mood: Mood.CALM
             };
         }
@@ -246,7 +246,7 @@ const commandHandlers = [
     {
         pattern: /^\/reminder\s+(\S+)\s+(.+)/i,
         response: async (chatId, msg) => {
-            await lyraTyping(chatId);
+            await AlyaTyping(chatId);
             const [, timeString, message] = msg.text.match(/^\/reminder\s+(\S+)\s+(.+)/i);
             const userName = msg.from.first_name || msg.from.username || 'Tuan';
             const responseText = await commandHelper.setReminder(botInstanceRef, chatId, timeString, message, userName);
@@ -257,7 +257,7 @@ const commandHandlers = [
     {
         pattern: /^\/note\s+(.+)/i,
         response: async (chatId, msg) => {
-            await lyraTyping(chatId);
+            await AlyaTyping(chatId);
             const [, noteMessage] = msg.text.match(/^\/note\s+(.+)/i);
             const userId = msg.from.id;
             const responseText = await commandHelper.addNote(userId, noteMessage);
@@ -268,7 +268,7 @@ const commandHandlers = [
     {
         pattern: /^\/shownotes/i,
         response: async (chatId, msg) => {
-            await lyraTyping(chatId);
+            await AlyaTyping(chatId);
             const userId = msg.from.id;
             const responseText = await commandHelper.showNotes(userId);
             return { text: responseText, mood: Mood.NORMAL };
@@ -290,8 +290,8 @@ const commandHandlers = [
                 const userNameForCommand = msg.from.first_name || USER_NAME;
 
                 if (query) {
-                    await lyraTyping(chatId);
-                    sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Lyra akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
+                    await AlyaTyping(chatId);
+                    sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Alya akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
 
 
                     const searchResultText = await commandHelper.performSearch(
@@ -316,7 +316,7 @@ const commandHandlers = [
     {
         pattern: /^\/help/i,
         response: async (chatId) => {
-            await lyraTyping(chatId);
+            await AlyaTyping(chatId);
             const responseText = commandHelper.getHelpMessage();
             return { text: responseText, mood: Mood.NORMAL };
         }
@@ -325,7 +325,7 @@ const commandHandlers = [
     {
         pattern: /^\/author/i,
         response: async (chatId) => {
-            await lyraTyping(chatId);
+            await AlyaTyping(chatId);
             const responseText = commandHelper.getAuthorInfo();
             return { text: responseText, mood: Mood.NORMAL };
         }
@@ -336,7 +336,7 @@ if (config.calendarificApiKey) {
     commandHandlers.push({
         pattern: /^\/(hariini|liburhariini|infohari)$/i, 
         response: async (chatId, msg) => { 
-            await lyraTyping(chatId); 
+            await AlyaTyping(chatId); 
 
             const holidayMessage = await holidaysModule.getFormattedTodaysHolidays(
                 config.calendarificApiKey,
@@ -364,8 +364,8 @@ const setBotInstance = (bot) => {
 };
 
 /**
- * Mengembalikan mood Lyra saat ini.
- * @returns {object} Objek mood Lyra saat ini.
+ * Mengembalikan mood Alya saat ini.
+ * @returns {object} Objek mood Alya saat ini.
  */
 const getCurrentMood = () => currentMood;
 
@@ -376,6 +376,6 @@ module.exports = {
     commandHandlers,
     setBotInstance,
     getCurrentMood,
-    lyraTyping, 
+    AlyaTyping, 
     setAISummarizer
 };

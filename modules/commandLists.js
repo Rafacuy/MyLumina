@@ -114,7 +114,7 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
         }
 
         if (!reminderTime || !reminderTime.isValid()) {
-            return `Maaf, Tuan ${userName}. Format waktu tidak valid atau Lyra tidak bisa memahami waktu yang Anda berikan. Gunakan HH:MM atau 'besok HH:MM'.`;
+            return `Maaf, Tuan ${userName}. Format waktu tidak valid atau Alya tidak bisa memahami waktu yang Anda berikan. Gunakan HH:MM atau 'besok HH:MM'.`;
         }
 
         const reminders = await loadReminders();
@@ -148,11 +148,11 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
         const formattedTime = formatJakartaTime(reminderTime);
         const formattedDate = formatJakartaDateTime(reminderTime).split(',')[0] + ", " + formatJakartaDateTime(reminderTime).split(',')[1]; // Ekstrak bagian tanggal
 
-        return `Baik, Tuan ${userName}! Lyra akan mengingatkan Anda pada ${formattedDate} pukul ${formattedTime} untuk: "${message}".`;
+        return `Baik, Tuan ${userName}! Alya akan mengingatkan Anda pada ${formattedDate} pukul ${formattedTime} untuk: "${message}".`;
 
     } catch (error) {
         console.error("Error di setReminder:", error.message, error.stack);
-        return `Maaf, Tuan ${userName}. Terjadi kesalahan internal saat Lyra mencoba mengatur pengingat.`;
+        return `Maaf, Tuan ${userName}. Terjadi kesalahan internal saat Alya mencoba mengatur pengingat.`;
     }
 };
 
@@ -293,13 +293,13 @@ const addNote = async (userId, noteMessage, userName) => {
         const saveSuccess = await saveNotes(userId, userNotes);
 
         if (saveSuccess) {
-            return `Baik, Tuan ${userName}! Catatan Anda telah Lyra simpan.`;
+            return `Baik, Tuan ${userName}! Catatan Anda telah Alya simpan.`;
         } else {
-            return `Maaf, Tuan ${userName}. Terjadi kesalahan saat Lyra mencoba menyimpan catatan Anda.`;
+            return `Maaf, Tuan ${userName}. Terjadi kesalahan saat Alya mencoba menyimpan catatan Anda.`;
         }
     } catch (error) {
         console.error(`Error di addNote untuk pengguna ${userId}:`, error.message, error.stack);
-        return `Maaf, Tuan ${userName}. Terjadi kesalahan internal saat Lyra mencoba menambah catatan.`;
+        return `Maaf, Tuan ${userName}. Terjadi kesalahan internal saat Alya mencoba menambah catatan.`;
     }
 };
 
@@ -311,12 +311,12 @@ const addNote = async (userId, noteMessage, userName) => {
  */
 const showNotes = async (userId, userName) => {
     if (!userId) {
-        return `Maaf, Tuan ${userName || 'Pengguna'}. Lyra tidak bisa menampilkan catatan tanpa ID pengguna.`;
+        return `Maaf, Tuan ${userName || 'Pengguna'}. Alya tidak bisa menampilkan catatan tanpa ID pengguna.`;
     }
     try {
         const userNotes = await loadNotes(userId);
         if (userNotes.length === 0) {
-            return `Tuan ${userName}, Anda belum memiliki catatan yang Lyra simpan.`;
+            return `Tuan ${userName}, Anda belum memiliki catatan yang Alya simpan.`;
         }
         let response = `Catatan pribadi Tuan ${userName}:\n\n`;
         userNotes.forEach((note, index) => {
@@ -329,20 +329,20 @@ const showNotes = async (userId, userName) => {
         return response;
     } catch (error) {
         console.error(`Error di showNotes untuk pengguna ${userId}:`, error.message, error.stack);
-        return `Maaf, Tuan ${userName}. Terjadi kesalahan internal saat Lyra mencoba menampilkan catatan Anda.`;
+        return `Maaf, Tuan ${userName}. Terjadi kesalahan internal saat Alya mencoba menampilkan catatan Anda.`;
     }
 };
 
 
 
-// --- Fitur Pencarian (Menggunakan Google Custom Search API & Lyra AI untuk Ringkasan) ---
+// --- Fitur Pencarian (Menggunakan Google Custom Search API & Alya AI untuk Ringkasan) ---
 
 /**
  * Melakukan pencarian menggunakan Google Custom Search API dan merangkum hasilnya dengan AI.
  * @param {string} query query pencarian.
  * @param {string} userName Nama pengguna.
  * @param {string|number} requestChatId ID chat permintaan, untuk pembatasan laju & konteks AI.
- * @param {Function} aiSummarizer Fungsi dari Lyra.js untuk menghasilkan ringkasan AI (misalnya, generateAIResponse).
+ * @param {Function} aiSummarizer Fungsi dari Alya.js untuk menghasilkan ringkasan AI (misalnya, generateAIResponse).
  * @returns {Promise<string>} String yang diformat dengan hasil pencarian dan ringkasannya.
  */
 async function performSearch(query, userName, requestChatId, aiSummarizer) {
@@ -355,7 +355,7 @@ async function performSearch(query, userName, requestChatId, aiSummarizer) {
 
     if (!apiKey || !cx) {
         console.error("Kunci API Google Search atau CX tidak dikonfigurasi di config.js (dotenv).");
-        return `Maaf, Tuan ${userName}. Fitur pencarian belum dikonfigurasi dengan benar oleh administrator. Lyra tidak bisa melanjutkan.`;
+        return `Maaf, Tuan ${userName}. Fitur pencarian belum dikonfigurasi dengan benar oleh administrator. Alya tidak bisa melanjutkan.`;
     }
 
     try {
@@ -372,7 +372,7 @@ async function performSearch(query, userName, requestChatId, aiSummarizer) {
 
         const data = response.data;
         if (data.items && data.items.length > 0) {
-            let resultText = `Lyra menemukan ini untuk "${query}", Tuan ${userName}:\n\n`;
+            let resultText = `Alya menemukan ini untuk "${query}", Tuan ${userName}:\n\n`;
             let contentToSummarize = "";
             data.items.forEach((item, index) => {
                 const title = item.title || "Judul tidak tersedia";
@@ -384,38 +384,38 @@ async function performSearch(query, userName, requestChatId, aiSummarizer) {
                 contentToSummarize += `${title}. ${snippet}\n`; // Kumpulkan konten untuk diringkas
             });
 
-            // Ringkasan dengan Lyra.js jika aiSummarizer tersedia dan ada konten
+            // Ringkasan dengan Alya.js jika aiSummarizer tersedia dan ada konten
             if (typeof aiSummarizer === 'function' && contentToSummarize.trim() !== "") {
-                resultText += `\n--- Ringkasan dari Lyra ---\n`;
+                resultText += `\n--- Ringkasan dari Alya ---\n`;
                 try {
-                    // Prompt yang lebih spesifik untuk memandu gaya Lyra
-                    const summarizationPrompt = `Sebagai Lyra, asisten AI yang cerdas dan sedikit tsundere, ringkaskan dengan gaya khasmu informasi berikut yang ditemukan untuk Tuan ${userName} terkait pencarian "${query}". Buat ringkasan yang informatif namun tetap singkat dan menarik:\n\n${contentToSummarize}`;
+                    // Prompt yang lebih spesifik untuk memandu gaya Alya
+                    const summarizationPrompt = `Sebagai Alya, asisten AI yang cerdas dan sedikit tsundere, ringkaskan dengan gaya khasmu informasi berikut yang ditemukan untuk Tuan ${userName} terkait pencarian "${query}". Buat ringkasan yang informatif namun tetap singkat dan menarik:\n\n${contentToSummarize}`;
 
                     const summary = await aiSummarizer(summarizationPrompt, requestChatId);
 
-                    // Periksa apakah ringkasan valid dan bukan pesan error/placeholder dari Lyra
+                    // Periksa apakah ringkasan valid dan bukan pesan error/placeholder dari Alya
                     if (summary && !summary.toLowerCase().includes("maaf") && !summary.toLowerCase().includes("zzz") && !summary.toLowerCase().includes("mohon bersabar") && summary.length > 15) { // Panjang minimal untuk ringkasan yang berarti
                         resultText += `${summary}\n\n`;
                     } else {
-                        resultText += `Hmph, sepertinya Lyra tidak bisa memberikan ringkasan yang bagus untuk ini, Tuan ${userName}. Mungkin hasilnya terlalu sedikit atau kurang jelas.\n\n`;
-                        console.log("Ringkasan oleh Lyra dilewati atau hasilnya tidak sesuai/error:", summary);
+                        resultText += `Hmph, sepertinya Alya tidak bisa memberikan ringkasan yang bagus untuk ini, Tuan ${userName}. Mungkin hasilnya terlalu sedikit atau kurang jelas.\n\n`;
+                        console.log("Ringkasan oleh Alya dilewati atau hasilnya tidak sesuai/error:", summary);
                     }
                 } catch (summarizationError) {
-                    console.error("Error selama peringkasan dengan Lyra:", summarizationError.message, summarizationError.stack);
-                    resultText += `Ugh, terjadi kesalahan teknis saat Lyra mencoba membuat ringkasan, Tuan ${userName}. Menyebalkan.\n\n`;
+                    console.error("Error selama peringkasan dengan Alya:", summarizationError.message, summarizationError.stack);
+                    resultText += `Ugh, terjadi kesalahan teknis saat Alya mencoba membuat ringkasan, Tuan ${userName}. Menyebalkan.\n\n`;
                 }
             } else if (typeof aiSummarizer !== 'function') {
-                resultText += `\n--- Ringkasan dari Lyra ---\nFitur ringkasan AI tidak tersedia saat ini karena ada masalah teknis, Tuan ${userName}.\n\n`;
+                resultText += `\n--- Ringkasan dari Alya ---\nFitur ringkasan AI tidak tersedia saat ini karena ada masalah teknis, Tuan ${userName}.\n\n`;
                 console.warn("Fungsi aiSummarizer tidak diberikan ke performSearch. Ringkasan dilewati.");
             }
             return resultText;
         } else {
-            return `Maaf, Tuan ${userName}. Lyra tidak menemukan hasil yang relevan untuk "${query}". Mungkin coba kata kunci lain?`;
+            return `Maaf, Tuan ${userName}. Alya tidak menemukan hasil yang relevan untuk "${query}". Mungkin coba kata kunci lain?`;
         }
     } catch (error) {
         console.error("Error mengambil dari Google Custom Search API:", error.response ? JSON.stringify(error.response.data) : error.message, error.stack);
         // Fallback untuk error API
-        let errorMessage = `Maaf, Tuan ${userName}. Terjadi masalah saat Lyra mencoba menghubungi layanan pencarian.`;
+        let errorMessage = `Maaf, Tuan ${userName}. Terjadi masalah saat Alya mencoba menghubungi layanan pencarian.`;
         if (error.response && error.response.status === 403) { // Forbidden, seringkali masalah kunci API atau kuota
             errorMessage += ` Sepertinya ada masalah dengan konfigurasi API pencarian atau kuota telah terlampaui.`;
         } else if (error.response && error.response.data && error.response.data.error && error.response.data.error.message) {
@@ -439,18 +439,18 @@ async function performSearch(query, userName, requestChatId, aiSummarizer) {
  */
 const getHelpMessage = (userName) => {
     try {
-        return `Daftar perintah Lyra untuk Tuan ${userName || 'Pengguna'}:\n\n` +
+        return `Daftar perintah Alya untuk Tuan ${userName || 'Pengguna'}:\n\n` +
                `• /reminder [HH:MM atau besok HH:MM] [pesan]: Menjadwalkan pengingat.\n` +
                `  Contoh: /reminder 14:30 Rapat penting\n` +
                `  Contoh: /reminder besok 09:00 Beli sarapan\n` +
                `• /note [pesan]*: Menyimpan catatan pribadi.\n` +
                `  Contoh: /note Jangan lupa bayar tagihan\n` +
                `• /shownotes*: Menampilkan semua catatan pribadi Anda.\n` +
-               `• /search [query]: Mencari informasi menggunakan Google & diringkas Lyra.\n` +
+               `• /search [query]: Mencari informasi menggunakan Google & diringkas Alya.\n` +
                `  Contoh: /search berita terbaru Indonesia\n` +
                `• /help : Menampilkan daftar perintah ini.\n` +
-               `• /author : Menampilkan informasi pembuat Lyra.\n\n` +
-               `(*) Perintah yang ditandai bintang lebih cocok digunakan dalam chat pribadi dengan Lyra.`;
+               `• /author : Menampilkan informasi pembuat Alya.\n\n` +
+               `(*) Perintah yang ditandai bintang lebih cocok digunakan dalam chat pribadi dengan Alya.`;
     } catch (error) {
         console.error("Error menghasilkan pesan bantuan:", error.message, error.stack);
         return "Maaf, terjadi kesalahan saat menampilkan bantuan. Silakan coba lagi nanti.";
@@ -463,13 +463,13 @@ const getHelpMessage = (userName) => {
  */
 const getAuthorInfo = () => {
     try {
-        return `Lyra v5.1 (Enhanced Search & Fallbacks)\n` + // Updated v5.1
+        return `Alya v5.1 (Enhanced Search & Fallbacks)\n` + // Updated v5.1
                `AUTHOR: Arash\n` +
                `TIKTOK: @rafardhancuy\n` +
                `Github: https://github.com/Rafacuy\n` +
                `LANGUAGE: ID (Indonesia)\n` +
                `TIME FORMAT: Asia/Jakarta\n` +
-               `FITUR BARU: Pencarian Google dengan ringkasan AI oleh Lyra!\n` +
+               `FITUR BARU: Pencarian Google dengan ringkasan AI oleh Alya!\n` +
                `MIT License`;
     } catch (error) {
         console.error("Error menghasilkan info author:", error.message, error.stack);

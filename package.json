@@ -1,7 +1,7 @@
 {
-  "name": "lyra-chatbot",
-  "version": "5.1.0",
-  "description": "Chatbot Lyra yang siap nemenin kamu saat kesepian! >V<",
+  "name": "alya-chatbot",
+  "version": "6.1.0",
+  "description": "Chatbot Alya yang siap nemenin kamu saat kesepian! >V<",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
