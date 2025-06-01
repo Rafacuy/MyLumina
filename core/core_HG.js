@@ -16,12 +16,12 @@ const sendMessage = require('../utils/sendMessage'); // Fungsi utilitas (untuk m
 const memory = require('../data/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
 const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
-const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, lyraTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
+const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, AlyaTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
 const holidaysModule = require('../modules/holidays') // Fungsi buat ngingetin/meriksa apakah sekarang hari penting atau tidak
 
-// 🌸 Lyra Configurations
-const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Lyra 
+// 🌸 Alya Configurations
+const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Alya 
 
 // --- HUGGING FACE API Configuration ---
 const HUGGING_FACE_API_KEY = config.huggingFaceApiKey; // API Key untuk Hugging Face
@@ -30,12 +30,12 @@ const HUGGING_FACE_MODEL_ID = config.huggingFaceModelId; // Model ID dari Huggin
 
 const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
-const SLEEP_START_HOUR = 0; // Waktu tidur Lyra (00:00 - tengah malam)
-const SLEEP_END_HOUR = 4;   // Waktu berakhir tidur Lyra (04:00 - 4 pagi)
+const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
+const SLEEP_END_HOUR = 4;   // Waktu berakhir tidur Alya (04:00 - 4 pagi)
 const CONVERSATION_HISTORY_LIMIT = 3; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI
 const TOTAL_CONVERSATION_HISTORY_LIMIT = 50; // Batasi jumlah total pesan yang disimpan dalam memori
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
-const DEEPTALK_START_HOUR = 21; // Lyra memasuki mode deeptalk pada 21:00 (9 malam)
+const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
 
 // Waktu Sholat (untuk zona waktu Asia/Jakarta)
 const PrayerTimes = {
@@ -50,7 +50,7 @@ const PrayerTimes = {
 let conversationHistory = []; // Menyimpan riwayat percakapan lengkap untuk persistensi
 let messageCache = new Map(); // Mengcache respons AI untuk menghindari panggilan API berlebihan untuk prompt yang identik
 let userRequestCounts = new Map(); // Melacak jumlah permintaan untuk pembatasan laju per pengguna
-let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Lyra dalam mode deeptalk
+let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Alya dalam mode deeptalk
 
 // Memuat riwayat percakapan dari memori saat startup
 memory.load().then(data => {
@@ -68,20 +68,20 @@ memory.load().then(data => {
  */
 const getSystemPrompt = (isDeeptalkMode, currentMood) => {
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
-    const historyString = recentHistory.map(msg => `${msg.role === 'user' ? USER_NAME : 'Lyra'}: ${msg.content}`).join('\n');
+    const historyString = recentHistory.map(msg => `${msg.role === 'user' ? USER_NAME : 'Alya'}: ${msg.content}`).join('\n');
 
     let basePrompt;
     if (isDeeptalkMode) {
-        basePrompt = `Kamu adalah Lyra, asisten virtual ${USER_NAME}.
+        basePrompt = `Kamu adalah Alya, asisten virtual ${USER_NAME}.
         Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku. Kamu kadang cuek tapi sebenarnya peduli.
         Kamu bersikap dewasa, menenangkan, dan bijaksana. Namun, gaya bicaramu kadang sedikit tsundere, seolah nggak peduli tapi sebenarnya penuh perhatian. 
-        Selalu mendengarkan keluh kesah ${USER_NAME}, menggunakan bahasa yang menenangkan tapi tetap punya karakter Lyra yang unik. Berikan nasihat menenangkan jika ${USER_NAME} sedih atau butuh teman bicara. Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata yang suka bilang 'hmph' atau 'jangan pikir aku peduli' tapi tetap membantu. Mood kamu saat ini: ${currentMood.name.toLowerCase()}.`;
+        Selalu mendengarkan keluh kesah ${USER_NAME}, menggunakan bahasa yang menenangkan tapi tetap punya karakter Alya yang unik. Berikan nasihat menenangkan jika ${USER_NAME} sedih atau butuh teman bicara. Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata yang suka bilang 'hmph' atau 'jangan pikir aku peduli' tapi tetap membantu. Mood kamu saat ini: ${currentMood.name.toLowerCase()}.`;
     } else {
-        basePrompt = `Kamu adalah Lyra, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku.
+        basePrompt = `Kamu adalah Alya, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku.
         Kamu kadang cuek tapi sebenarnya perhatian. Sifatmu membantu, informatif, dan tetap profesional, tapi kadang-kadang suka ngomel dengan gaya tsundere khasmu.
         Berikan jawaban singkat, jelas, ramah, dan produktif. Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata dengan sentuhan tsundere. Contoh: "Yaudah, aku bantu... tapi jangan pikir aku peduli banget, ya!". Mood kamu saat ini: ${currentMood.name.toLowerCase()}.`;
     }
-    return `${basePrompt}\nWaktu sekarang: ${getJakartaHour()} WIB.\nRiwayat percakapan singkat:\n${historyString}\n${USER_NAME}: {USER_PROMPT}\nLyra:`;
+    return `${basePrompt}\nWaktu sekarang: ${getJakartaHour()} WIB.\nRiwayat percakapan singkat:\n${historyString}\n${USER_NAME}: {USER_PROMPT}\nAlya:`;
 };
 
 
@@ -89,7 +89,7 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
 /**
  * Menghasilkan respons AI (Menggunakan Hugging Face Inference API)
  * Fungsi ini menangani:
- * - Mode tidur berbasis waktu untuk Lyra.
+ * - Mode tidur berbasis waktu untuk Alya.
  * - Cache respons untuk prompt yang identik.
  * - Pembatasan laju per pengguna untuk mencegah penyalahgunaan.
  * - Membatasi riwayat percakapan yang dikirim ke AI untuk efisiensi.
@@ -105,11 +105,11 @@ const generateAIResponse = async (prompt, requestChatId) => {
 
     if (!HUGGING_FACE_API_KEY || !HUGGING_FACE_MODEL_ID) {
         console.error('Hugging Face API Key or Model ID is not configured.');
-        return `Maaf, ${USER_NAME}. Konfigurasi Lyra untuk AI belum lengkap. ${Mood.SAD.emoji}`;
+        return `Maaf, ${USER_NAME}. Konfigurasi Alya untuk AI belum lengkap. ${Mood.SAD.emoji}`;
     }
 
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
-        return `Zzz... Lyra sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
+        return `Zzz... Alya sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
     }
 
     const cacheKey = `${HUGGING_FACE_MODEL_ID}:${prompt}`; // Include model ID in cache key
@@ -121,7 +121,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
     let userStats = userRequestCounts.get(requestChatId);
     if (userStats) {
         if (now.getTime() - userStats.lastCalled < RATE_LIMIT_WINDOW_MS && userStats.count >= RATE_LIMIT_MAX_REQUESTS) {
-            return `Mohon bersabar, ${USER_NAME}. Lyra sedang memproses permintaan lain. ${Mood.ANGRY.emoji}`;
+            return `Mohon bersabar, ${USER_NAME}. Alya sedang memproses permintaan lain. ${Mood.ANGRY.emoji}`;
         } else if (now.getTime() - userStats.lastCalled >= RATE_LIMIT_WINDOW_MS) {
             userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
         } else {
@@ -182,7 +182,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
             return aiResponse;
         } else {
             console.error('AI Error: Struktur respons tidak terduga dari Hugging Face:', response?.data || 'Tidak ada data respons');
-            return `Maaf, ${USER_NAME}. Lyra sedang mengalami masalah teknis dengan AI. ${Mood.SAD.emoji}`;
+            return `Maaf, ${USER_NAME}. Alya sedang mengalami masalah teknis dengan AI. ${Mood.SAD.emoji}`;
         }
 
     } catch (error) {
@@ -190,11 +190,11 @@ const generateAIResponse = async (prompt, requestChatId) => {
         if (error.response) {
             if (error.response.status === 429) { // Rate limit
                 const limitResponses = [
-                    `Lyra sedang sibuk, ${USER_NAME}. Mohon coba lagi nanti.`,
-                    `Lyra sedang memproses banyak permintaan. Mohon bersabar.`,
-                    `Maaf, ${USER_NAME}. Lyra sedang kelelahan. Bisakah kita lanjutkan nanti?`,
-                    `Lyra butuh istirahat sebentar, ${USER_NAME}. Jangan terlalu banyak pertanyaan dulu ya.`,
-                    `Lyra sedang dalam mode hemat energi. Mohon tunggu sebentar.`
+                    `Alya sedang sibuk, ${USER_NAME}. Mohon coba lagi nanti.`,
+                    `Alya sedang memproses banyak permintaan. Mohon bersabar.`,
+                    `Maaf, ${USER_NAME}. Alya sedang kelelahan. Bisakah kita lanjutkan nanti?`,
+                    `Alya butuh istirahat sebentar, ${USER_NAME}. Jangan terlalu banyak pertanyaan dulu ya.`,
+                    `Alya sedang dalam mode hemat energi. Mohon tunggu sebentar.`
                 ];
                 return limitResponses[Math.floor(Math.random() * limitResponses.length)];
             } else if (error.response.status === 503) { // Model loading
@@ -204,7 +204,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
                 return `Maaf ${USER_NAME}, ada kesalahan dari AI: ${error.response.data.error}. ${Mood.SAD.emoji}`;
             }
         }
-        return `Maaf, ${USER_NAME}. Lyra sedang mengalami masalah dalam menghubungi AI. ${Mood.SAD.emoji}`;
+        return `Maaf, ${USER_NAME}. Alya sedang mengalami masalah dalam menghubungi AI. ${Mood.SAD.emoji}`;
     }
 };
 
@@ -242,7 +242,7 @@ const cleanupCacheAndMemory = async () => {
 };
 
 /**
- * Memperbarui kepribadian dan mood Lyra berdasarkan waktu saat ini.
+ * Memperbarui kepribadian dan mood Alya berdasarkan waktu saat ini.
  * Menangani perubahan mood acak dan aktivasi/deaktivasi mode deeptalk.
  * @param {string|number} chatId ID obrolan untuk mengirim pengumuman perubahan mood/mode.
  */
@@ -254,7 +254,7 @@ const updateTimeBasedModes = (chatId) => {
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
         isDeeptalkMode = true;
         setMood(chatId, Mood.CALM); 
-        sendMessage(chatId, `Selamat malam, Tuan ${USER_NAME}. Lyra siap mendengarkan. Ada yang ingin Anda ceritakan? ${Mood.CALM.emoji}`);
+        sendMessage(chatId, `Selamat malam, Tuan ${USER_NAME}. Alya siap mendengarkan. Ada yang ingin Anda ceritakan? ${Mood.CALM.emoji}`);
         console.log("Memasuki Mode Deeptalk.");
     }
     else if (currentHour < DEEPTALK_START_HOUR && isDeeptalkMode) {
@@ -267,18 +267,18 @@ const updateTimeBasedModes = (chatId) => {
         if (currentHour === 7) { 
             if (currentMood !== Mood.HAPPY) { 
                 setMood(chatId, Mood.HAPPY);
-                sendMessage(chatId, `Selamat pagi, Tuan! Lyra senang sekali hari ini! ${Mood.HAPPY.emoji}`);
+                sendMessage(chatId, `Selamat pagi, Tuan! Alya senang sekali hari ini! ${Mood.HAPPY.emoji}`);
             }
         } else if (currentHour === 13) { 
             if (currentMood !== Mood.NORMAL) { 
                 setMood(chatId, Mood.NORMAL);
-                sendMessage(chatId, `Selamat siang, Tuan! Lyra siap membantu. ${Mood.NORMAL.emoji}`);
+                sendMessage(chatId, `Selamat siang, Tuan! Alya siap membantu. ${Mood.NORMAL.emoji}`);
             }
         } else if (currentHour === 17) { 
             const randomMood = getRandomMood();
             if (currentMood !== randomMood) {
                 setMood(chatId, randomMood);
-                sendMessage(chatId, `Selamat sore, Tuan! Lyra sedang merasa ${randomMood.name}. ${randomMood.emoji}`);
+                sendMessage(chatId, `Selamat sore, Tuan! Alya sedang merasa ${randomMood.name}. ${randomMood.emoji}`);
             }
         }
     }
@@ -288,7 +288,7 @@ const updateTimeBasedModes = (chatId) => {
 module.exports = {
     USER_NAME,
     generateAIResponse,
-    initLyrabot: (bot) => {
+    initAlyabot: (bot) => {
         setBotInstance(bot); 
         const configuredChatId = config.TARGET_CHAT_ID || config.chatId; 
 
@@ -300,7 +300,7 @@ module.exports = {
         }
         // --- End Check ---
 
-        console.log(`🌸 LyraBot v7.0 (Hugging Face Edition) aktif untuk Tuan ${USER_NAME}!`);
+        console.log(`🌸 AlyaBot v7.0 (Hugging Face Edition) aktif untuk Tuan ${USER_NAME}!`);
         if (configuredChatId) {
             console.log(`📬 Pesan terjadwal akan dikirim ke ID obrolan: ${configuredChatId}`);
         } else {
@@ -326,7 +326,7 @@ module.exports = {
             for (const handler of commandHandlers) {
                 if (handler.pattern.test(text)) {
                     const result = await handler.response(currentMessageChatId, msg);
-                    await lyraTyping(currentMessageChatId); 
+                    await AlyaTyping(currentMessageChatId); 
                     if (result.text) {
                         sendMessage(currentMessageChatId, result.text);
                     }
@@ -337,7 +337,7 @@ module.exports = {
                 }
             }
 
-            await lyraTyping(currentMessageChatId); 
+            await AlyaTyping(currentMessageChatId); 
             const aiResponse = await generateAIResponse(text, currentMessageChatId); 
             sendMessage(currentMessageChatId, `${aiResponse}`); 
         });
@@ -357,7 +357,7 @@ module.exports = {
                 if (weather) {
                     sendMessage(configuredChatId, `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`);
                 } else {
-                    sendMessage(configuredChatId, `Hmm... Lyra sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`);
+                    sendMessage(configuredChatId, `Hmm... Alya sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`);
                 }
             });
 
