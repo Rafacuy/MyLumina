@@ -441,16 +441,13 @@ const getHelpMessage = (userName) => {
     try {
         return `Daftar perintah Alya untuk Tuan ${userName || 'Pengguna'}:\n\n` +
                `• /reminder [HH:MM atau besok HH:MM] [pesan]: Menjadwalkan pengingat.\n` +
-               `  Contoh: /reminder 14:30 Rapat penting\n` +
-               `  Contoh: /reminder besok 09:00 Beli sarapan\n` +
                `• /note [pesan]*: Menyimpan catatan pribadi.\n` +
-               `  Contoh: /note Jangan lupa bayar tagihan\n` +
                `• /shownotes*: Menampilkan semua catatan pribadi Anda.\n` +
                `• /search [query]: Mencari informasi menggunakan Google & diringkas Alya.\n` +
-               `  Contoh: /search berita terbaru Indonesia\n` +
                `• /help : Menampilkan daftar perintah ini.\n` +
                `• /author : Menampilkan informasi pembuat Alya.\n\n` +
-               `(*) Perintah yang ditandai bintang lebih cocok digunakan dalam chat pribadi dengan Alya.`;
+               `(*) Perintah yang ditandai bintang lebih cocok digunakan dalam chat pribadi dengan Alya.` +
+               `Sst, Ada Secret Command loh!, Coba tebak ...`;
     } catch (error) {
         console.error("Error menghasilkan pesan bantuan:", error.message, error.stack);
         return "Maaf, terjadi kesalahan saat menampilkan bantuan. Silakan coba lagi nanti.";

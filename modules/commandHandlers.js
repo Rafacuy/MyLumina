@@ -6,8 +6,9 @@ const config = require('../config/config'); // Configuration File
 const Mood = require('./mood');
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weather'); // Weather utility
 const holidaysModule = require('./holidays');
+const sendSadSongNotification = require('../utils/songNotifier')
 
-// 🌸 Alya Configuration 
+// 🌸 Alya Configuration
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
 const USER_NAME = config.USER_NAME;
 
@@ -17,55 +18,21 @@ let moodTimeoutId; // Menyimpan ID timeout reset mood
 let botInstanceRef; // Referensi ke instance bot Telegram
 let globalAISummarizer = null;
 
+let personalityMode = 'TSUNDERE'; // Default personality mode: 'TSUNDERE' or 'DEREDERE'
+
+const setPersonalityMode = (mode) => {
+    personalityMode = mode;
+    console.log(`[Personality] Alya's personality mode set to: ${personalityMode}`);
+};
+
+const getPersonalityMode = () => personalityMode;
+
 const setAISummarizer = (fn) => {
     globalAISummarizer = fn;
 };
 
 const getAISummarizer = () => globalAISummarizer;
 
-// Lagu Sedih
-const sadSongs = [
-    {
-        "title": "Car's Outside - James Arthur",
-        "url": "https://www.youtube.com/watch?v=v27COkZT4GY&pp=0gcJCdgAo7VqN5tD",
-        "reason": "Lagu buat kamu yang udah nyampe tapi nggak bisa ketemu, karena keadaan nggak pernah berpihak."
-    },
-    {
-        "title": "Keane - Somewhere Only We Know (Official Music Video)",
-        "url": "https://www.youtube.com/watch?v=Oextk-If8HQ",
-        "reason": "Kalau kamu pernah punya tempat rahasia bareng seseorang, tapi sekarang cuma tinggal kenangan. :)"
-    },
-    {
-        "title": "Armada - Asal Kau Bahagia (Official Lyric Video)",
-        "url": "https://www.youtube.com/watch?v=py6GDNgye6k",
-        "reason": "Saat mencintai harus rela ngelepas, karena yang kamu cintai lebih bahagia tanpa kamu."
-    },
-    {
-        "title": "Armada - Hargai Aku (Official Music Video)",
-        "url": "https://www.youtube.com/watch?v=9B7UcTBJYCA",
-        "reason": "Tentang rasa lelah dicintai sepihak dan harapan kecil agar kamu dilihat dan dihargai."
-    },
-    {
-        "title": "Impossible - James Arthur [Speed up] | (Lyrics & Terjemahan)",
-        "url": "https://www.youtube.com/watch?v=p6om2S-ZpRY",
-        "reason": "Cerita tentang cinta yang udah hancur, tapi sisa sakitnya tetap tinggal selamanya."
-    },
-    {
-        "title": "Daun Jatuh - Resah Jadi Luka (Official Audio)",
-        "url": "https://www.youtube.com/watch?v=tOMFR0nQt48",
-        "reason": "Ketika rasa resah nggak pernah reda, dan akhirnya berubah jadi luka yang dalam."
-    },
-    {
-        "title": "Keisya Levronka - Tak Ingin Usai (Official Lyric Video)",
-        "url": "https://www.youtube.com/watch?v=FB1YNEOspyA",
-        "reason": "Karena nggak semua pertemuan bisa selamanya, meski kamu nggak mau itu berakhir."
-    },
-    {
-        "title": "VIONITA - DIA MASA LALUMU, AKU MASA DEPANMU (OFFICIAL MUSIC VIDEO)",
-        "url": "https://www.youtube.com/watch?v=05wQrmLejyo",
-        "reason": "Untuk seseorang yang belum bisa lepas dari masa lalu, padahal masa depannya udah di depan mata."
-    }
-];
 
 /**
  * Mensimulasikan aksi bot mengetik di obrolan tertentu untuk durasi yang ditentukan.
@@ -85,23 +52,6 @@ const AlyaTyping = async (chatId, duration = 1500) => {
     }
 };
 
-/**
- * Memilih lagu sedih secara acak dari daftar.
- * @returns {object} Objek yang berisi judul dan URL lagu sedih acak.
- */
-const getRandomSadSong = () => {
-    const randomIndex = Math.floor(Math.random() * sadSongs.length);
-    return sadSongs[randomIndex];
-};
-
-/**
- * Mengirim notifikasi lagu sedih secara acak.
- * @param {string|number} chatId ID obrolan untuk mengirim notifikasi.
- */
-const sendSadSongNotification = async (chatId) => {
-    const song = getRandomSadSong();
-    sendMessage(chatId, `🎶 Judul: ${song.title}\n${song.reason}\n${song.url}`);
-};
 
 /**
  * Mengatur mood Alya dan menjadwalkan reset kembali ke 'NORMAL' setelah durasi tertentu.
@@ -139,7 +89,7 @@ const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
  * @returns {object} Objek mood yang dipilih secara acak.
  */
 const getRandomMood = () => {
-    const moods = Object.values(Mood).filter(mood => mood !== Mood.CALM); 
+    const moods = Object.values(Mood).filter(mood => mood !== Mood.CALM);
     const randomIndex = Math.floor(Math.random() * moods.length);
     return moods[randomIndex];
 };
@@ -147,17 +97,27 @@ const getRandomMood = () => {
 const commandHandlers = [
     {
         pattern: /^(hai|halo|bot|helo|haii|woy|hoy)/i, // Pola regex untuk dicocokkan
-        response: () => ({
-            text: `${currentMood.emoji} Hai ${USER_NAME}! Ada yang bisa Alya bantu? ${currentMood.emoji}`,
-            mood: Mood.HAPPY // Mood yang akan diatur setelah perintah ini
-        })
+        response: (chatId) => { // Tambahkan chatId sebagai argumen
+            const greeting = personalityMode === 'TSUNDERE' ?
+                `Hmph, apa maumu, Tuan? ${currentMood.emoji}` :
+                `Halo, Tuan~! Alya senang kamu di sini! ${currentMood.emoji}`;
+            return {
+                text: greeting,
+                mood: Mood.HAPPY // Mood yang akan diatur setelah perintah ini
+            };
+        }
     },
     {
         pattern: /^(terima kasih|makasih|makasih ya)/i,
-        response: () => ({
-            text: `Sama-sama, ${USER_NAME}! Alya senang bisa membantu. ${Mood.HAPPY.emoji}`,
-            mood: Mood.HAPPY
-        })
+        response: (chatId) => { // Tambahkan chatId sebagai argumen
+            const thanksResponse = personalityMode === 'TSUNDERE' ?
+                `J-jangan berlebihan! Aku cuma melakukan tugasku. ${Mood.NORMAL.emoji}` :
+                `*Giggle* Makasih, Tuan~! Alya senang bisa bantu! >_< ${Mood.HAPPY.emoji}`;
+            return {
+                text: thanksResponse,
+                mood: Mood.HAPPY
+            };
+        }
     },
     {
         pattern: /(siapa kamu|kamu siapa)/i,
@@ -181,9 +141,13 @@ const commandHandlers = [
         })
     },
     {
-        pattern: /^(cuaca|info cuaca|cuaca hari ini)/i,
+        pattern: /^\/cuaca/i,
         response: async (chatId) => {
             await AlyaTyping(chatId);
+            const weatherCheckMessage = personalityMode === 'TSUNDERE' ?
+                `Cuaca, huh? Hmph.. Baiklah, Alya akan cek cuacanya, tunggu bentar..` :
+                `Oke, Tuan~! Alya akan cek cuaca untukmu! Sebentar ya~`;
+            sendMessage(chatId, weatherCheckMessage);
             const weather = await getWeatherData();
             if (weather) {
                 return {
@@ -192,7 +156,7 @@ const commandHandlers = [
                 };
             } else {
                 return {
-                    text: `Hmm... Alya sedang tidak dapat mengambil data cuaca. ${Mood.SAD.emoji}`,
+                    text: `Hmm... Alya kek nya. ${Mood.SAD.emoji}`,
                     mood: Mood.SAD
                 };
             }
@@ -221,7 +185,7 @@ const commandHandlers = [
         }
     },
     {
-        pattern: /^(tanggal berapa|hari ini tanggal berapa)/i,
+        pattern: /(tanggal berapa|hari ini tanggal berapa)/i,
         response: () => {
             const now = new Date();
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' };
@@ -236,13 +200,15 @@ const commandHandlers = [
         pattern: /(lagi sedih|lagi galau|patah hati|lagi nangis)/i,
         response: async (chatId) => {
             await sendSadSongNotification(chatId);
+            const comfortMessage = personalityMode === 'TSUNDERE' ?
+                `*Dengus* Lemah banget... tapi aku dengar. ${Mood.CALM.emoji}` :
+                `Peluk virtual~ Aku di sini untukmu! ${Mood.CALM.emoji}`;
             return {
-                text: `Saya mengerti perasaan Anda, Tuan ${USER_NAME}. Alya di sini untuk mendengarkan. ${Mood.CALM.emoji}`,
+                text: comfortMessage,
                 mood: Mood.CALM
             };
         }
     },
-    // Perintah baru: Reminder
     {
         pattern: /^\/reminder\s+(\S+)\s+(.+)/i,
         response: async (chatId, msg) => {
@@ -253,7 +219,6 @@ const commandHandlers = [
             return { text: responseText, mood: Mood.NORMAL };
         }
     },
-    // Perintah baru: Note
     {
         pattern: /^\/note\s+(.+)/i,
         response: async (chatId, msg) => {
@@ -264,7 +229,6 @@ const commandHandlers = [
             return { text: responseText, mood: Mood.HAPPY };
         }
     },
-    // Perintah baru: Show Notes
     {
         pattern: /^\/shownotes/i,
         response: async (chatId, msg) => {
@@ -276,8 +240,8 @@ const commandHandlers = [
     },
     // Perintah baru: Search
     {
-        pattern: /^\/search\s+(.+)$/i, 
-        response: async (chatId, msg) => { 
+        pattern: /^\/search\s+(.+)$/i,
+        response: async (chatId, msg) => {
             try {
                 // Ekstrak kueri pencarian dari pesan menggunakan pola RegEx
                 const match = msg.text.match(/^\/search\s+(.+)$/i);
@@ -300,11 +264,9 @@ const commandHandlers = [
                         chatId,
                         getAISummarizer()
                     );
-                    // sendMessage(chatId, searchResultText); // Ini akan dikirim oleh return { text: searchResultText }
                     return { text: searchResultText }; // Kembalikan teks untuk dikirim oleh loop handler utama
                 } else {
-                    // Ini juga seharusnya tidak terjadi jika pola RegEx memerlukan (.+) alias opsional
-                     return { text: `Tuan ${userNameForCommand}, mohon berikan kata kunci pencarian setelah perintah /search.` };
+                    return { text: `Tuan ${userNameForCommand}, mohon berikan kata kunci pencarian setelah perintah /search.` };
                 }
             } catch (error) {
                 console.error("Error di handler /search:", error);
@@ -312,7 +274,6 @@ const commandHandlers = [
             }
         }
     },
-    // Perintah baru: Help
     {
         pattern: /^\/help/i,
         response: async (chatId) => {
@@ -321,7 +282,6 @@ const commandHandlers = [
             return { text: responseText, mood: Mood.NORMAL };
         }
     },
-    // Perintah baru: Author
     {
         pattern: /^\/author/i,
         response: async (chatId) => {
@@ -329,24 +289,45 @@ const commandHandlers = [
             const responseText = commandHelper.getAuthorInfo();
             return { text: responseText, mood: Mood.NORMAL };
         }
-    }
-];    
+    },
+    // ---  Personality Switch Commands ---
+    {
+        pattern: /^\/tsundere/i,
+        response: async (chatId) => {
+            setPersonalityMode('TSUNDERE');
+            return {
+                text: `Hmph, baiklah! Alya akan kembali ke mode Tsundere. Jangan harap aku jadi manis, Idiot! 🔥`,
+                mood: Mood.ANGRY // Atau mood yang sesuai untuk Tsundere
+            };
+        }
+    },
+    {
+        pattern: /^\/deredere/i,
+        response: async (chatId) => {
+            setPersonalityMode('DEREDERE');
+            return {
+                text: `Kyaa~! Oke, Tuan~ Alya akan jadi manis dan ramah untukmu! 🌸`,
+                mood: Mood.HAPPY // Atau mood yang sesuai untuk Deredere
+            };
+        }
+    },
+];
 
 if (config.calendarificApiKey) {
     commandHandlers.push({
-        pattern: /^\/(hariini|liburhariini|infohari)$/i, 
-        response: async (chatId, msg) => { 
-            await AlyaTyping(chatId); 
+        pattern: /^\/(hariini|liburhariini|infohari)$/i,
+        response: async (chatId, msg) => {
+            await AlyaTyping(chatId);
 
             const holidayMessage = await holidaysModule.getFormattedTodaysHolidays(
                 config.calendarificApiKey,
                 'ID', // Ganti 'ID' dengan kode negara yang diinginkan jika perlu
                 config.USER_NAME // Mengambil USER_NAME dari config untuk personalisasi
             );
-            
+
             // Berdasarkan struktur commandHandlers di core.js yang Anda berikan,
             // handler harus mengembalikan objek dengan properti 'text'.
-            return { text: holidayMessage }; 
+            return { text: holidayMessage };
         }
     });
     console.log('[Commands] Perintah /hariini untuk info hari libur telah diaktifkan.');
@@ -376,6 +357,7 @@ module.exports = {
     commandHandlers,
     setBotInstance,
     getCurrentMood,
-    AlyaTyping, 
-    setAISummarizer
+    AlyaTyping,
+    setAISummarizer,
+    getPersonalityMode 
 };
