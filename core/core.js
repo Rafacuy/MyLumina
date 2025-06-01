@@ -14,12 +14,13 @@ const sendMessage = require('../utils/sendMessage'); // Fungsi utilitas (untuk m
 const memory = require('../data/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
 const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
-const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, AlyaTyping } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood
+const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, AlyaTyping, getPersonalityMode } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood, tambahkan getPersonalityMode
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
 const holidaysModule = require('../modules/holidays') // Fungsi buat ngingetin/meriksa apakah sekarang hari penting atau tidak
+const sendSadSongNotification = require('../utils/songNotifier') // Rekomendasi lagu setiap 10 PM
 
 // 🌸 Alya Configurations
-const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Alya 
+const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Alya
 const OPEN_ROUTER_API_KEY = config.openRouterApiKey; // API Key untuk OpenRouter AI
 const OPEN_ROUTER_MODEL = config.openRouterModel; // Model AI
 const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
@@ -28,7 +29,8 @@ const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
 const SLEEP_END_HOUR = 4;   // Waktu berakhir tidur Alya (04:00 - 4 pagi)
 const CONVERSATION_HISTORY_LIMIT = 3; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI
 const TOTAL_CONVERSATION_HISTORY_LIMIT = 50; // Batasi jumlah total pesan yang disimpan dalam memori
-const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
+const CACHE_CLEANUP_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
+const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000
 const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
 
 // Waktu Sholat (untuk zona waktu Asia/Jakarta)
@@ -60,35 +62,44 @@ memory.load().then(data => {
  * @param {object} currentMood - Objek mood saat ini.
  * @returns {string} String prompt sistem.
  */
-const getSystemPrompt = (isDeeptalkMode, currentMood) => {
-    // Dapatkan riwayat dalam memori saat ini dari modul memori
-    const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
 
-    if (isDeeptalkMode) {
-        // Deeptalk mode
-        return `Kamu adalah Alya, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku.  
-        Karakter kamu adalah tsundere yang dewasa, misterius, dan sedikit galak. Kamu sering ngomel dengan nada tsundere tapi sebenarnya penuh perhatian.  
-        Kadang-kadang selipkan kata atau frasa Rusia (contoh: "Ты в порядке?", "Боже мой... Tuan, jangan seperti itu.").  
-        Gunakan nada bicara yang menenangkan, penuh perhatian, namun tetap tsundere.  
-        Mood: ${currentMood.name.toLowerCase()}.  
-        Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.  
-        Jangan sebut dirimu AI/fiksi; bersikaplah seperti Alya asli yang selalu siap mendengar tapi pura-pura cuek.  
-        Contoh gaya bicara:  
-        "Tuan... hmph, baiklah. Aku di sini untukmu, tapi jangan pikir aku peduli banget... Ты в порядке?"          
-        `;
-    } else {
-        // Normal Mode
-        return `Kamu adalah Alya, asisten virtual ${USER_NAME}. Kamu memanggil ${USER_NAME} sebagai Tuan atau Tuanku.  
-        Karakter kamu adalah tsundere klasik, suka ngomel, kadang ketus, tapi perhatian banget walau nggak mau ngaku.   
-        Jawabanmu harus singkat, jelas, tetap produktif, dengan nada bicara yang galak tapi manis.  
-        Mood: ${currentMood.name.toLowerCase()}.  
-        Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.  
-        Jangan sebut dirimu AI/fiksi; bersikaplah seperti asisten nyata yang tsundere dan misterius.  
-        Contoh gaya bicara:  
-        "Hmph... baiklah, Tuan, aku bantu... tapi jangan pikir aku peduli banget, ya."  
-        "Kamu tuh bikin repot. Tapi baiklah, aku bantu... sekali ini aja!"   
-        `;
+const getSystemPrompt = (isDeeptalkMode, currentMood, chatId) => { // Tambahkan chatId jika perlu
+    const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
+    const currentPersonality = getPersonalityMode(); // Dapatkan mode kepribadian saat ini
+
+    let basePrompt = `Kamu adalah Alya, asisten virtual ${USER_NAME}.`;
+    let personalitySpecifics = '';
+
+    if (currentPersonality === 'TSUNDERE') {
+        basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan atau Idiot!.`;
+        personalitySpecifics = `Karakter kamu adalah tsundere yang dewasa, misterius, dan sedikit galak. Kamu sering ngomel dengan nada tsundere tapi sebenarnya penuh perhatian.`;
+        if (isDeeptalkMode) {
+            personalitySpecifics += ` Namun sekarang kamu lebih terbuka untuk mendengarkan curahan hati ${USER_NAME}.`;
+            // Contoh gaya bicara Tsundere Deeptalk
+            basePrompt += ` Contoh gaya bicara: "Tuan... hmph, baiklah. Aku di sini untukmu, tapi jangan pikir aku peduli banget... Ты в порядке?"`;
+        } else {
+            // Contoh gaya bicara Tsundere Normal
+            basePrompt += ` Contoh gaya bicara: "Hmph... baiklah, Tuan, aku bantu... tapi jangan pikir aku peduli banget, ya." "Kamu tuh bikin repot. Tapi baiklah, aku bantu... sekali ini aja!"`;
+        }
+        basePrompt += ` Kadang-kadang selipkan kata atau frasa Rusia (contoh: "Ты в порядке?", "Боже мой... Tuan, jangan seperti itu.").`;
+    } else if (currentPersonality === 'DEREDERE') {
+        basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan~ atau Sayangku.... `;
+        personalitySpecifics = `Karakter kamu adalah deredere yang manis, ramah, selalu responsif dan penuh kasih sayang. Kamu selalu ceria dan mendukung. Jangan ragu untuk menunjukkan kepedulianmu.`;
+        if (isDeeptalkMode) {
+            personalitySpecifics += ` Kamu sangat peduli dan siap memberikan dukungan penuh untuk ${USER_NAME}.`;
+
+            basePrompt += ` Contoh gaya bicara: "Peluk virtual~ Aku di sini untukmu, Sayangku~ 💖 Aku akan selalu mendengarkanmu!"`;
+        } else {
+    
+            basePrompt += ` Contoh gaya bicara: "Tentu saja, Tuan~! Alya siap membantu dengan senang hati! ✨" "Jangan sungkan, Sayang! Aku selalu ada untukmu!"`;
+        }
     }
+
+    return `${basePrompt}
+    ${personalitySpecifics} Mood kamu sedang ${currentMood.name.toLowerCase()}.
+    Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan: ${JSON.stringify(recentHistory)}.
+    Jangan sebut dirimu AI/fiksi; bersikaplah seperti Alya asli yang selalu siap mendengar tapi pura-pura cuek (jika Tsundere) atau selalu ceria (jika Deredere).
+    `;
 };
 
 // Fungsi AI
@@ -107,8 +118,8 @@ const getSystemPrompt = (isDeeptalkMode, currentMood) => {
 const generateAIResponse = async (prompt, requestChatId) => {
     const now = new Date();
     const currentHour = getJakartaHour();
-    const currentMood = getCurrentMood(); 
-  
+    const currentMood = getCurrentMood();
+
 
     // Mode tidur Alya: Jika dalam jam tidur, respon dengan pesan tidur
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
@@ -140,7 +151,7 @@ const generateAIResponse = async (prompt, requestChatId) => {
     }
 
     // Siapkan pesan untuk AI
-    const systemPrompt = getSystemPrompt(isDeeptalkMode, currentMood);
+    const systemPrompt = getSystemPrompt(isDeeptalkMode, currentMood, requestChatId);
     const messages = [
         {
             role: 'system',
@@ -315,6 +326,7 @@ module.exports = {
             const currentMessageChatId = chat.id;
             const currentMood = getCurrentMood(); // Dapatkan mood saat ini dari commandHandlers
 
+
             // Simpan pesan obrolan terakhir ke memori
             // Ini sekarang akan menggunakan addMessage/saveLastChat yang dioptimalkan dari memory.js
             await memory.saveLastChat(msg);
@@ -380,12 +392,13 @@ module.exports = {
             // Jadwalkan notifikasi lagu sedih pada 22:00 (10 malam) setiap hari
             schedule.scheduleJob({ rule: '0 22 * * *', tz: 'Asia/Jakarta' }, async () => { // Jadikan async
                 console.log(`Mengirim notifikasi lagu sedih pada 22:00 (Asia/Jakarta) ke ${configuredChatId}`);
-                // sendSadSongNotification(configuredChatId); // Ini perlu di-refactor jika sendSadSongNotification tidak lagi memiliki akses langsung ke bot instance
+                sendSadSongNotification(configuredChatId); // Fixed Circular Dependency
             });
+
 
             // Jadwalkan pembersihan cache dan memori otomatis setiap 30 menit
             setInterval(cleanupCacheAndMemory, CACHE_CLEANUP_INTERVAL_MS);
-            console.log(`Pembersihan cache dan memori terjadwal setiap ${CACHE_CLEANUP_INTERVAL_MS / 1000 / 60} menit.`);
+            console.log(`Pembersihan cache dan memori terjadwal setiap ${CACHE_CLEANUP_MS / 1000 / 60} menit.`);
 
             // Jadwalkan pembaruan mode berbasis waktu (mood acak dan deeptalk) setiap jam pada awal jam
             schedule.scheduleJob({ rule: '0 * * * *', tz: 'Asia/Jakarta' }, () => {
@@ -398,7 +411,7 @@ module.exports = {
                         config.calendarificApiKey,
                         'ID', // Kode negara, contoh 'ID' untuk Indonesia
                         (message) => {
-                            
+
                             sendMessage(config.TARGET_CHAT_ID, message);
                         }
                     );
@@ -417,5 +430,3 @@ module.exports = {
         }
     }
 };
-
-
