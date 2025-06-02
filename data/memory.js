@@ -10,6 +10,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const zlib = require('zlib');
+const config = require('../config/config')
 
 // --- Configuration Constants ---
 const MEMORY_FILE = path.join(__dirname, 'memory.ndjson.gz'); // Main active memory file, now NDJSON and gzipped
@@ -19,7 +20,7 @@ const MAX_HISTORY_LENGTH = 100; // Maximum number of messages to keep in active 
 const ARCHIVE_THRESHOLD = 90; // When in-memory history reaches this length, oldest messages are archived
 const ARCHIVE_CHUNK_SIZE = 50; // Number of messages to move to archive when threshold is met
 const BACKUP_RETENTION = 3; // Number of recent 'memory.ndjson.gz' backups to keep
-const TARGET_USER_NAME = 'Arash'; // Username for specific chat saving logic
+const TARGET_USER_NAME = config.USER_NAME; // Username for specific chat saving logic
 
 // --- Global State Variables ---
 let inMemoryHistory = []; // The fixed-size queue (ring buffer) for active conversation history
@@ -283,12 +284,12 @@ const searchHistory = async (keyword, limit = 5) => {
 // --- Module Exports ---
 module.exports = {
     load,
-    save: flush, // Expose `flush` as `save` for external calls (e.g., from hoshino.js)
+    save: flush, // Expose `flush` as `save` for external calls 
     addMessage,
     searchHistory,
     getLastChatBy,
     saveLastChat,
-    // Helper to get the current in-memory history for other modules (e.g., hoshino.js for AI context)
+    // Helper to get the current in-memory history for other modules 
     getInMemoryHistory: () => inMemoryHistory
 };
 

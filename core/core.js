@@ -9,6 +9,7 @@
 
 // IMPORTANT!
 const axios = require('axios').default;
+const { InferenceClient } = require("@huggingface/inference");
 const config = require('../config/config'); // File Konfigurasi (API, ChatID, dll)
 const sendMessage = require('../utils/sendMessage'); // Fungsi utilitas (untuk mengirim pesan)
 const memory = require('../data/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
@@ -21,8 +22,7 @@ const sendSadSongNotification = require('../utils/songNotifier') // Rekomendasi 
 
 // 🌸 Alya Configurations
 const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Alya
-const OPEN_ROUTER_API_KEY = config.openRouterApiKey; // API Key untuk OpenRouter AI
-const OPEN_ROUTER_MODEL = config.openRouterModel; // Model AI
+const HUGGING_FACE_API_KEY = config.huggingFaceApiKey; // API Key untuk Hugging Face Inference API
 const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
 const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
@@ -32,6 +32,9 @@ const TOTAL_CONVERSATION_HISTORY_LIMIT = 50; // Batasi jumlah total pesan yang d
 const CACHE_CLEANUP_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000
 const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
+
+// --- Hugging Face Inizilitation --- 
+const client = new InferenceClient(HUGGING_FACE_API_KEY);
 
 // Waktu Sholat (untuk zona waktu Asia/Jakarta)
 const PrayerTimes = {
@@ -103,8 +106,7 @@ const getSystemPrompt = (isDeeptalkMode, currentMood, chatId) => { // Tambahkan 
 };
 
 // Fungsi AI
-/**
- * Menghasilkan respons AI (Menggunakan OpenRouter API)
+/** * Menghasilkan respons AI (Menggunakan Hugging Face Inference API)
  * Fungsi ini menangani:
  * - Mode tidur berbasis waktu untuk Alya.
  * - Cache respons untuk prompt yang identik.
@@ -120,101 +122,64 @@ const generateAIResponse = async (prompt, requestChatId) => {
     const currentHour = getJakartaHour();
     const currentMood = getCurrentMood();
 
-
-    // Mode tidur Alya: Jika dalam jam tidur, respon dengan pesan tidur
+    // Mode tidur Alya
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
         return `Zzz... Alya sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
     }
 
-    // Memeriksa apakah respons prompt sudah ada di cache
+    // Cek cache
     if (messageCache.has(prompt)) {
-        console.log(`Mengambil respons dari cache untuk: "${prompt}"`);
+        console.log(`Cache hit untuk: "${prompt}"`);
         return messageCache.get(prompt);
     }
 
-    // Logika pembatasan laju per pengguna (berdasarkan requestChatId)
+    // Rate limit
     let userStats = userRequestCounts.get(requestChatId);
     if (userStats) {
-        // Jika dalam jendela batas laju dan permintaan maksimal tercapai, kembalikan pesan batas laju
         if (now.getTime() - userStats.lastCalled < RATE_LIMIT_WINDOW_MS && userStats.count >= RATE_LIMIT_MAX_REQUESTS) {
-            return `Mohon bersabar, ${USER_NAME}. Alya sedang memproses permintaan lain. ${Mood.ANGRY.emoji}`;
+            return `Alya lagi sibuk, ${USER_NAME}. Mohon sabar ya! ${Mood.ANGRY.emoji}`;
         } else if (now.getTime() - userStats.lastCalled >= RATE_LIMIT_WINDOW_MS) {
-            // Reset hitungan jika di luar jendela
             userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
         } else {
-            // Tingkatkan hitungan jika dalam jendela
             userRequestCounts.set(requestChatId, { count: userStats.count + 1, lastCalled: now.getTime() });
         }
     } else {
-        // Inisialisasi (untuk pengguna baru)
         userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
     }
 
-    // Siapkan pesan untuk AI
     const systemPrompt = getSystemPrompt(isDeeptalkMode, currentMood, requestChatId);
-    const messages = [
-        {
-            role: 'system',
-            content: systemPrompt
-        },
-        {
-            role: 'user',
-            content: prompt
-        }
-    ];
+    const fullPrompt = `${systemPrompt}\n\nUser: ${prompt}\n\nAlya:`;
 
     try {
-        const response = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-            model: OPEN_ROUTER_MODEL,
-            messages,
-            temperature: 0.7, // Control random responses
-            max_tokens: 160 // Max token on AI responses
-        }, {
-            headers: {
-                'Authorization': `Bearer ${OPEN_ROUTER_API_KEY}`,
-                'X-Client-Type': 'application/json',
-            }
+        console.log("Mengirim request ke HF InferenceClient...");
+        const chatCompletion = await client.chatCompletion({
+            provider: "novita", // Provider inference yang support model lo (misal 'novita', 'vllm', dsb)
+            model: "deepseek-ai/DeepSeek-V3-0324", // Ganti ke model lo yang bener
+            messages: [
+                { role: "system", content: systemPrompt },
+                { role: "user", content: prompt }
+            ]
         });
 
-        // Validasi struktur respons AI
-        if (response?.data?.choices?.length > 0 && response.data.choices[0].message?.content) {
-            const aiResponse = response.data.choices[0].message.content;
+        if (chatCompletion?.choices?.[0]?.message) {
+            const aiResponse = chatCompletion.choices[0].message.content.trim();
 
-            // Perbarui riwayat percakapan global melalui modul memori
+            // Simpan history + cache
             await memory.addMessage({ role: 'user', content: prompt });
             await memory.addMessage({ role: 'assistant', content: aiResponse });
-
-            // Cache respons AI untuk durasi singkat (1 menit)
             messageCache.set(prompt, aiResponse);
-            setTimeout(() => {
-                messageCache.delete(prompt); // Hapus dari cache setelah timeout
-            }, 60 * 1000);
+            setTimeout(() => messageCache.delete(prompt), 60 * 1000);
 
             return aiResponse;
         } else {
-            console.error('AI Error: Struktur respons tidak terduga dari OpenRouter:', response?.data || 'Tidak ada data respons');
-            return `Maaf, ${USER_NAME}. Alya sedang mengalami masalah teknis. ${Mood.SAD.emoji}`;
+            console.error('Inference Error:', chatCompletion);
+            return `Maaf, ${USER_NAME}. Alya lagi error nih. ${Mood.SAD.emoji}`;
         }
-
     } catch (error) {
-        console.error('AI API Call Error:', error.response?.data || error.message);
-        // Tangani kesalahan API tertentu, misal: batas laju (HTTP 429)
-        if (error.response && error.response.status === 429) {
-            const limitResponses = [
-                `Alya sedang sibuk, ${USER_NAME}. Mohon coba lagi nanti.`,
-                `Alya sedang memproses banyak permintaan. Mohon bersabar.`,
-                `Maaf, ${USER_NAME}. Alya sedang kelelahan. Bisakah kita lanjutkan nanti?`,
-                `Alya butuh istirahat sebentar, ${USER_NAME}. Jangan terlalu banyak pertanyaan dulu ya.`,
-                `Alya sedang dalam mode hemat energi. Mohon tunggu sebentar.`
-            ];
-            const randomIndex = Math.floor(Math.random() * limitResponses.length);
-            return limitResponses[randomIndex];
-        }
-        // Pesan kesalahan umum untuk kegagalan API lainnya
-        return `Maaf, ${USER_NAME}. Alya sedang mengalami masalah. ${Mood.SAD.emoji}`;
+        console.error('HF API Call Error:', error.response?.data || error.message);
+        return `Maaf, ${USER_NAME}. Alya lagi error nih. ${Mood.SAD.emoji}`;
     }
 };
-
 /**
  * Memeriksa apakah string yang diberikan hanya terdiri dari emoji.
  * Menggunakan Unicode property escapes untuk deteksi emoji yang komprehensif.
