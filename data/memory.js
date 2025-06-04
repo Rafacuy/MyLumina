@@ -244,21 +244,23 @@ const getLastChatBy = async (userName) => {
  * @param {object} message The incoming message object.
  * @returns {Promise<void>} A promise that resolves when the operation is complete.
  */
-const saveLastChat = async (message) => {
+const saveLastChat = async (messageObject) => { // messageObject adalah objek lengkap dari core.js
     try {
-        if (message?.from?.first_name === TARGET_USER_NAME) {
-            // Remove any previous message from the TARGET_USER_NAME to keep only the latest
+        // Jika messageObject.from.first_name adalah TARGET_USER_NAME
+        if (messageObject?.from?.first_name === TARGET_USER_NAME) {
+            // Hapus pesan sebelumnya dari TARGET_USER_NAME jika ada
             const existingIndex = inMemoryHistory.findIndex(msg =>
-                msg.from && msg.from.first_name === TARGET_USER_NAME && msg.from.id === message.from.id
+                msg.from && msg.from.first_name === TARGET_USER_NAME && msg.from.id === messageObject.from.id
             );
             if (existingIndex !== -1) {
                 inMemoryHistory.splice(existingIndex, 1);
             }
-            // Add the new message. addMessage will handle the ring buffer logic.
-            await addMessage(message);
+            // Tambahkan messageObject baru yang sudah berisi konteks
+            await addMessage(messageObject); // Gunakan addMessage internal untuk konsistensi
         }
+        // Jika bukan TARGET_USER_NAME, mungkin tidak melakukan apa-apa atau logika lain
     } catch (error) {
-        console.error('Error saving last chat:', error);
+        console.error('Error saving last chat in memory.js:', error);
     }
 };
 
