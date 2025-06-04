@@ -7,6 +7,7 @@ module.exports = {
     huggingFaceApiKey: process.env.HG_API_KEY, 
     USER_NAME: 'Arash', // Username
     TARGET_CHAT_ID: process.env.TARGET_CHAT_ID,
+    togetherAiApiKey: process.env.TOGETHER_API_KEY,
     weatherApiKey: process.env.WEATHER_API_KEY,
     calendarificApiKey: process.env.CALENDARIFIC_API_KEY,
     GOOGLE_SEARCH_API_KEY: process.env.GOOGLE_SEARCH_API_KEY,
