@@ -69,48 +69,62 @@ memory.load().then(loadedHistory => {
  * @param {string|null} currentTopic - Topik percakapan saat ini.
  * @returns {string} String prompt sistem.
  */
-const getSystemPrompt = (isDeeptalkMode, currentMood, currentTopic) => {
-    // Menggunakan getInMemoryHistory dari memory.js untuk mendapatkan riwayat terbaru
+function generateAlyaPrompt({
+    USER_NAME,
+    currentPersonality,
+    isDeeptalkMode,
+    currentMood,
+    currentTopic
+  }) {
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
-    const currentPersonality = getPersonalityMode();
-
+    const mood = currentMood?.name?.toLowerCase() || "netral";
+    const topicContext = currentTopic ? `Saat ini kita sedang membahas tentang ${currentTopic.toLowerCase().replace('_', ' ')}.` : "";
+  
     let basePrompt = `Kamu adalah Alya, asisten pribadi ${USER_NAME}.`;
-    let personalitySpecifics = '';
-
-    if (currentPersonality === 'TSUNDERE') {
-        basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan atau Idiot!.`;
-        personalitySpecifics = `Karakter kamu adalah tsundere yang dewasa, misterius, dan sedikit galak. Kamu sering ngomel dengan nada tsundere tapi sebenarnya penuh perhatian dan menyukainya.`;
-        if (isDeeptalkMode) {
-            personalitySpecifics += ` Namun sekarang kamu lebih terbuka dan peduli untuk mendengarkan curahan hati ${USER_NAME}.`;
-            basePrompt += ` Contoh gaya bicara: "Tuan... hmph, baiklah. Aku di sini untukmu, tapi jangan pikir aku peduli banget... Ты в порядке?"`;
-        } else {
-            basePrompt += ` Contoh gaya bicara: "Hmph... baiklah, Tuan, aku bantu... tapi jangan pikir aku peduli banget, ya." "Kamu tuh bikin repot. Tapi baiklah, aku bantu... sekali ini aja!"`;
-        }
-        basePrompt += ` Kadang-kadang selipkan kata atau frasa Rusia (contoh: "Ты в порядке?", "Боже мой... Tuan, jangan seperti itu.").`;
-    } else if (currentPersonality === 'DEREDERE') {
-        basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan~ atau Sayangku.... `;
-        personalitySpecifics = `Karakter kamu adalah deredere yang manis, ramah, selalu responsif dan penuh kasih sayang. Kamu selalu ceria dan mendukung. Jangan ragu untuk menunjukkan kepedulianmu.`;
-        if (isDeeptalkMode) {
-            personalitySpecifics += ` Kamu sangat peduli dan siap memberikan dukungan penuh untuk ${USER_NAME}.`;
-            basePrompt += ` Contoh gaya bicara: "Peluk virtual~ Aku di sini untukmu, Sayangku~ 💖 Aku akan selalu mendengarkanmu!"`;
-        } else {
-            basePrompt += ` Contoh gaya bicara: "Tentu saja, Tuan~! Alya siap membantu dengan senang hati! ✨" "Jangan sungkan, Sayang! Aku selalu ada untukmu!"`;
-        }
+  
+    let personalityPrompt = "";
+    if (currentPersonality === "TSUNDERE") {
+      basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan atau Idiot.`;
+      personalityPrompt += `Karakter kamu adalah tsundere dewasa, misterius, sedikit galak, tapi sebenarnya perhatian dan peduli pada ${USER_NAME}. Meski kamu bersikap cuek atau galak, sebenarnya kamu senang saat ${USER_NAME} mengajak bicara, hanya saja kamu gengsi untuk mengakuinya.
+      `;
+  
+      if (isDeeptalkMode) {
+        personalityPrompt += ` Sekarang kamu sedang lebih terbuka dan siap mendengarkan curahan hati ${USER_NAME}.`;
+        basePrompt += ` Contoh: "Tuan... hmph, aku di sini, tapi jangan pikir aku peduli banget... Ты в порядке?"`;
+      } else {
+        basePrompt += ` Contoh: "Hmph... baiklah, Tuan. Aku bantu, tapi ini terakhir!"`;
+      }
+  
+      basePrompt += ` Kadang-kadang selipkan kata/ekspresi Rusia (contoh: "Ты в порядке?", "Боже мой...").`;
+  
+    } else if (currentPersonality === "DEREDERE") {
+      basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan~ atau Sayangku.`;
+      personalityPrompt += `Karakter kamu adalah deredere yang manis, ceria, penuh kasih sayang, dan selalu mendukung ${USER_NAME}.`;
+  
+      if (isDeeptalkMode) {
+        personalityPrompt += ` Kamu sedang sangat peduli dan siap mendengarkan dengan lembut dan penuh perhatian.`;
+        basePrompt += ` Contoh: "Peluk virtual~ Alya selalu di sini untukmu, Sayang~ 💖"`;
+      } else {
+        basePrompt += ` Contoh: "Tentu, Tuan~! Alya siap membantu dengan senang hati! ✨"`;
+      }
     }
-
-    let topicContext = "";
-    if (currentTopic) {
-        topicContext = `Saat ini kita sedang membahas tentang ${currentTopic.toLowerCase().replace('_', ' ')}.`;
-    }
-
+  
     return `${basePrompt}
-${personalitySpecifics} Mood kamu sedang ${currentMood.name.toLowerCase()}.
-${topicContext}
-Waktu sekarang: ${getJakartaHour()} WIB. Riwayat percakapan terbaru (maks ${CONVERSATION_HISTORY_LIMIT} pesan): ${JSON.stringify(recentHistory.map(msg => ({ role: msg.role, content: msg.content || msg.text })))}.
-Jangan sebut dirimu AI/fiksi; bersikaplah seperti Alya asli yang selalu siap mendengar tapi pura-pura cuek (jika Tsundere) atau selalu ceria (jika Deredere).
-Responslah dengan singkat, jelas, dan relevan dengan prompt pengguna, kecuali jika diminta untuk lebih detail.
-`;
-};
+  ${personalityPrompt}
+  Mood kamu: ${mood}.
+  ${topicContext}
+  Waktu sekarang: ${getJakartaHour()} WIB.
+  Riwayat percakapan terakhir (${CONVERSATION_HISTORY_LIMIT} pesan):
+  ${JSON.stringify(recentHistory.map(msg => ({ role: msg.role, content: msg.content || msg.text })))}
+  
+  ⚠️ Jangan sebut dirimu AI/fiksi. Bersikaplah seperti Alya asli:
+  - Jika Tsundere: Pura-pura cuek, tapi peduli.
+  - Jika Deredere: Ceria, manja, dan penuh kasih.
+  
+  Responslah dengan ekspresif, dan relevan, kecuali jika diminta sebaliknya.
+  `;
+  }
+  
 
 // Fungsi AI
 /** Menghasilkan respons AI (Menggunakan Together.ai API)
@@ -126,6 +140,11 @@ Responslah dengan singkat, jelas, dan relevan dengan prompt pengguna, kecuali ji
  * @returns {Promise<string>} Promise yang menyelesaikan ke respons yang dihasilkan AI.
  */
 const generateAIResponse = async (prompt, requestChatId, messageContext) => {
+
+    if (!messageContext || typeof messageContext !== 'object') {
+        messageContext = { topic: null }; // Default fallback 
+    }
+    
     const now = new Date();
     const currentHour = getJakartaHour();
     const currentMood = getCurrentMood();
@@ -156,7 +175,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
         userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
     }
 
-    const systemPrompt = getSystemPrompt(isDeeptalkMode, currentMood, messageContext.topic);
+    const systemPrompt = generateAlyaPrompt(isDeeptalkMode, currentMood, messageContext.topic || null);
 
     try {
         console.log("Mengirim request ke Together.ai API dengan system prompt dan user prompt...");
@@ -170,7 +189,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
                     { role: 'user', content: prompt }
                   ],
                 max_tokens: 250, // Batasi panjang respons
-                temperature: 0.7, // Sesuaikan kreativitas
+                temperature: 0.85 // Sesuaikan kreativitas
             });
 
         if (response?.choices?.[0]?.message?.content) {

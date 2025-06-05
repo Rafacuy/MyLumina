@@ -160,7 +160,6 @@ const load = async () => {
  */
 const flush = async () => {
     if (!isDirty) {
-        // console.log('No changes to save, skipping flush.'); // Uncomment for verbose logging
         return true; // Indicate success as nothing needed to be saved
     }
 
