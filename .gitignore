@@ -1,4 +1,6 @@
 .env
-/data/backups
-/data/archive
-/data/memory.ndjson.gz
+backups/
+archives/
+memory.ndjson.gz
+reminders.json
+notes.json
