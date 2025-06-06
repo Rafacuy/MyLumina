@@ -1,7 +1,7 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 🌸 AlyaBot v6.1 (Optimized) – Productive Assistant
+# 🌸 AlyaBot v7.1 (Optimized) – Productive Assistant
 
 > Telegram ChatBot smart, and act as your assistant.  
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)  
@@ -9,7 +9,7 @@
 
 ---
 
-## ✨ What's New in v6.1?
+## ✨ What's New in v7.1?
 
 -  **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
 - 💾 **Ring Buffer + Archival**: History auto-archive, no RAM overload
@@ -41,7 +41,7 @@
 ### Prerequisites
 - **Node.js** (>= 18)
 - **Telegram Bot Token** from [@BotFather](https://t.me/BotFather)
-- **OpenRouter API Key** from [OpenRouter](https://OpenRouter.ai)
+- **Groq API Key** from [Groq](https://groq.com)
 - **OpenWeatherMap API Key** from [OpenWeatherMap](https://openweathermap.org)
 - **Google Custom Search API Key & CSE ID** 
 - **Your Telegram Chat ID** for scheduled messages
@@ -64,8 +64,7 @@ Example:
 
 ```bash
 TELEGRAM_BOT_TOKEN=YOUR_TELEGRAM_TOKEN # Replace it to your actual Telegram Bot Token
-OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY # Replace it to your OpenRouter API key
-OPENROUTER_MODEL=meta-llama/llama-3.5-8b-instruct # (Optional) Change it to model that you want
+GROQ_API_KEY=YOUR_GROQ_API_KEY # Change to your Groq API Key
 WEATHER_API_KEY=YOUR_OPENWEATHERMAP_KEY # Replace it to your actual OpenWeather API Key
 LATITUDE=-6.200000 # Change it to your location LATITUDE (e.g, Jakarta)
 LONGITUDE=106.816666 # Change it to your location LONGITUDE (e.g, jakarta)
@@ -76,8 +75,7 @@ GOOGLE_SEARCH_CX=YOUR_CSE_ID # Your google search CSEID
 ```
 
 - `TELEGRAM_BOT_TOKEN`: Your Telegram Bot API token from BotFather.
-- `OPENROUTER_API_KEY`: Your API key from [OpenRouter](https://openrouter.ai)
-- `OPENROUTER_MODEL`: The specific AI model you want to use from OpenRouter (e.g., meta-llama/llama-3.1-8b-instruct).
+- `GROQ_API_KEY`: Your Groq API Key from [groq](https://groq.com).
 - `TARGET_CHAT_ID`: The chat ID where Alya will send scheduled messages like prayer times and weather updates
 - `WEATHER_API_KEY`: Your API key from [OpenWeatherMap](https://OpenWeatherMap.org)
 - `LATITUDE` and `LONGITUDE`: The geographic coordinates for which you want weather updates.
