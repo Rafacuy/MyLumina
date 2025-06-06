@@ -6,7 +6,7 @@ const axios = require('axios'); // Untuk membuat permintaan HTTP ke API
 const config = require('../config/config'); // File konfigurasi untuk kunci API dan pengaturan lainnya
 const sendMessage = require('../utils/sendMessage'); // Utilitas untuk mengirim pesan (pastikan ada dan tangguh)
 const { formatJakartaDateTime, formatJakartaTime, getJakartaMoment } = require('../utils/timeHelper'); // Utilitas untuk waktu Jakarta (pastikan ada dan tangguh)
-const { generateAIResponse } = require('../core/core');
+const { generateAIResponse } = require('../core/coreRouter');
 
 const REMINDERS_FILE = './data/reminders.json'; // Path ke file JSON pengingat
 const NOTES_FILE = './data/notes.json'; // Path ke file JSON catatan
@@ -388,7 +388,6 @@ async function performSearch(query, userName, requestChatId, aiSummarizer) {
             if (typeof aiSummarizer === 'function' && contentToSummarize.trim() !== "") {
                 resultText += `\n--- Ringkasan dari Alya ---\n`;
                 try {
-                    // Prompt yang lebih spesifik untuk memandu gaya Alya
                     const summarizationPrompt = `Sebagai Alya, asisten AI yang cerdas dan sedikit tsundere, ringkaskan dengan gaya khasmu informasi berikut yang ditemukan untuk Tuan ${userName} terkait pencarian "${query}". Buat ringkasan yang informatif namun tetap singkat dan menarik:\n\n${contentToSummarize}`;
 
                     const summary = await aiSummarizer(summarizationPrompt, requestChatId);
@@ -460,7 +459,7 @@ const getHelpMessage = (userName) => {
  */
 const getAuthorInfo = () => {
     try {
-        return `Alya v5.1 (Enhanced Search & Fallbacks)\n` + // Updated v5.1
+        return `Alya v8.1 \n` + 
                `AUTHOR: Arash\n` +
                `TIKTOK: @rafardhancuy\n` +
                `Github: https://github.com/Rafacuy\n` +
@@ -482,6 +481,4 @@ module.exports = {
     performSearch,
     getHelpMessage,
     getAuthorInfo,
-    // Optional: ekspor fungsi internal jika diperlukan di tempat lain (gw gak gunain)
-    // ensureDirExists, loadReminders, saveReminders, loadNotes, saveNotes (Opsional doang)
 };
