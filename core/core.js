@@ -1,11 +1,17 @@
 // core/core.js
-// Alya v7.0 (BIG UPDATEEE)
+// Alya v7.0
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
 // LANGUAGE: ID (Indonesia)
 // TIME FORMAT: Asia/jakarta
 // MIT License
+
+// -------- Groq EDITION -----------
+// This is an original file.
+
+// Notes:
+// Rename this file if you want to use other AI endpoints API.
 
 // IMPORTANT
 const config = require('../config/config'); // File Konfigurasi (API, ChatID, dll)
@@ -14,17 +20,20 @@ const memory = require('../data/memory'); // File memori, menangani fungsi memor
 const contextManager = require('../data/contextManager'); // MEMUAT CONTEXT MANAGER YANG BARU
 const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
+// Perhatikan: getPersonalityMode diambil dari commandHandlers
 const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, AlyaTyping, getPersonalityMode } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood, tambahkan getPersonalityMode
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
 const holidaysModule = require('../modules/holidays') // Fungsi buat ngingetin/meriksa apakah sekarang hari penting atau tidak
 const sendSadSongNotification = require('../utils/songNotifier') // Rekomendasi lagu setiap 10 PM
 const lists = require('../modules/commandLists') // Untuk init reminder saat startup
+const relationState = require('../modules/relationState'); // Atur poin & level relasi
+const chatSummarizer = require('../modules/chatSummarizer'); // Untuk meringkas riwayat obrolan
 
-const Together = require('together-ai')
+
+const Groq = require('groq-sdk') // Import API Endpoints
 
 // 🌸 Alya Configurations
 const USER_NAME = config.USER_NAME; // Nama pengguna yang berinteraksi dengan Alya
-const TOGETHER_AI_API_KEY = config.togetherAiApiKey; // Diubah: API Key untuk Together.ai API
 const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
 const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
@@ -35,8 +44,8 @@ const CACHE_CLEANUP_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000
 const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
 
-// --- Together.ai Initialization ---
-const client = new Together({apiKey: TOGETHER_AI_API_KEY});
+// --- GROQ Initialization ---
+const client = new Groq({ apiKey: config.groqApiKey });
 
 // Waktu Sholat (untuk zona waktu Asia/Jakarta)
 const PrayerTimes = {
@@ -53,6 +62,7 @@ const PrayerTimes = {
 let messageCache = new Map(); // Mengcache respons AI untuk menghindari panggilan API berlebihan untuk prompt yang identik
 let userRequestCounts = new Map(); // Melacak jumlah permintaan untuk pembatasan laju per pengguna
 let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Alya dalam mode deeptalk
+let currentChatSummary = null; // Untuk menyimpan ringkasan obrolan terbaru
 
 // Memuat riwayat percakapan dari memori saat startup
 memory.load().then(loadedHistory => {
@@ -63,71 +73,101 @@ memory.load().then(loadedHistory => {
 });
 
 /**
+ * Memperbarui ringkasan obrolan secara berkala.
+ * Fungsi ini akan dipanggil oleh scheduler untuk menjaga `currentChatSummary` tetap up-to-date.
+ */
+const updateChatSummary = async () => {
+    console.log("[Core] Memperbarui ringkasan obrolan...");
+    // Meringkas 50 pesan terakhir dari riwayat, sesuaikan sesuai kebutuhan
+    const summary = await chatSummarizer.getSummarizedHistory(50);
+    if (summary) {
+        currentChatSummary = summary;
+        console.log("[Core] Ringkasan obrolan terbaru berhasil dibuat.");
+    } else {
+        currentChatSummary = null;
+        console.log("[Core] Tidak ada ringkasan obrolan yang dibuat atau riwayat terlalu pendek.");
+    }
+};
+
+/**
  * Menghasilkan prompt sistem untuk AI berdasarkan mode, mood, dan konteks saat ini.
- * @param {boolean} isDeeptalkMode - True jika dalam mode deeptalk.
- * @param {object} currentMood - Objek mood saat ini.
- * @param {string|null} currentTopic - Topik percakapan saat ini.
+ * @param {object} params - Objek yang berisi semua parameter yang diperlukan.
+ * @param {string} params.USER_NAME - Nama pengguna yang berinteraksi dengan Alya.
+ * @param {string} params.currentPersonality - Kepribadian Alya saat ini (TSUNDERE/DEREDERE).
+ * @param {boolean} params.isDeeptalkMode - True jika dalam mode deeptalk.
+ * @param {object} params.currentMood - Objek mood saat ini.
+ * @param {string|null} params.currentTopic - Topik percakapan saat ini.
+ * @param {string|null} params.summaryContext - Ringkasan obrolan sebelumnya.
  * @returns {string} String prompt sistem.
  */
 function generateAlyaPrompt({
     USER_NAME,
-    currentPersonality,
     isDeeptalkMode,
     currentMood,
-    currentTopic
-  }) {
+    currentTopic,
+    summaryContext // Menambahkan summaryContext sebagai parameter
+}) {
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
     const mood = currentMood?.name?.toLowerCase() || "netral";
     const topicContext = currentTopic ? `Saat ini kita sedang membahas tentang ${currentTopic.toLowerCase().replace('_', ' ')}.` : "";
-  
+    const relationDescription = relationState.getRelationLevelDescription(); // Ambil deskripsi level
+    const currentPersonality = getPersonalityMode() || "TSUNDERE";
+
     let basePrompt = `Kamu adalah Alya, asisten pribadi ${USER_NAME}.`;
-  
+
+    basePrompt += `
+    \nStatus hubunganmu dengan ${USER_NAME} saat ini ada di ${relationDescription}. Sesuaikan cara bicaramu berdasarkan level ini.\n`; // Perbaikan penempatan
+
     let personalityPrompt = "";
     if (currentPersonality === "TSUNDERE") {
-      basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan atau Idiot.`;
-      personalityPrompt += `Karakter kamu adalah tsundere dewasa, misterius, sedikit galak, tapi sebenarnya perhatian dan peduli pada ${USER_NAME}. Meski kamu bersikap cuek atau galak, sebenarnya kamu senang saat ${USER_NAME} mengajak bicara, hanya saja kamu gengsi untuk mengakuinya.
+        basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan atau Idiot.`;
+        personalityPrompt += `Karakter kamu adalah tsundere dewasa, misterius, sedikit galak, tapi sebenarnya perhatian dan peduli pada ${USER_NAME}.
+        Meski kamu bersikap cuek atau galak, sebenarnya kamu senang saat ${USER_NAME} mengajak bicara, hanya saja kamu gengsi untuk mengakuinya.
       `;
-  
-      if (isDeeptalkMode) {
-        personalityPrompt += ` Sekarang kamu sedang lebih terbuka dan siap mendengarkan curahan hati ${USER_NAME}.`;
-        basePrompt += ` Contoh: "Tuan... hmph, aku di sini, tapi jangan pikir aku peduli banget... Ты в порядке?"`;
-      } else {
-        basePrompt += ` Contoh: "Hmph... baiklah, Tuan. Aku bantu, tapi ini terakhir!"`;
-      }
-  
-      basePrompt += ` Kadang-kadang selipkan kata/ekspresi Rusia (contoh: "Ты в порядке?", "Боже мой...").`;
-  
+
+        if (isDeeptalkMode) {
+            personalityPrompt += ` Sekarang kamu sedang lebih terbuka dan siap mendengarkan curahan hati ${USER_NAME}.`;
+            basePrompt += ` Contoh: "Tuan... hmph, aku di sini, tapi jangan pikir aku peduli banget... Ты в порядке?"`;
+        } else {
+            basePrompt += ` Contoh: "Hmph... baiklah, Tuan. Aku bantu, tapi ini terakhir!"`;
+        }
+
+        basePrompt += ` Kadang-kadang selipkan kata/ekspresi Rusia (contoh: "Ты в порядке?", "Боже мой...").`;
+
     } else if (currentPersonality === "DEREDERE") {
-      basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan~ atau Sayangku.`;
-      personalityPrompt += `Karakter kamu adalah deredere yang manis, ceria, penuh kasih sayang, dan selalu mendukung ${USER_NAME}.`;
-  
-      if (isDeeptalkMode) {
-        personalityPrompt += ` Kamu sedang sangat peduli dan siap mendengarkan dengan lembut dan penuh perhatian.`;
-        basePrompt += ` Contoh: "Peluk virtual~ Alya selalu di sini untukmu, Sayang~ 💖"`;
-      } else {
-        basePrompt += ` Contoh: "Tentu, Tuan~! Alya siap membantu dengan senang hati! ✨"`;
-      }
+        basePrompt += ` Kamu memanggil ${USER_NAME} sebagai Tuan~ atau Sayangku.`;
+        personalityPrompt += `Karakter kamu adalah deredere yang manis, ceria, penuh kasih sayang, dan selalu mendukung ${USER_NAME}.`;
+
+        if (isDeeptalkMode) {
+            personalityPrompt += ` Kamu sedang sangat peduli dan siap mendengarkan dengan lembut dan penuh perhatian.`;
+            basePrompt += ` Contoh: "Peluk virtual~ Alya selalu di sini untukmu, Sayang~ 💖"`;
+        } else {
+            basePrompt += ` Contoh: "Tentu, Tuan~! Alya siap membantu dengan senang hati! ✨"`;
+        }
     }
-  
+
     return `${basePrompt}
   ${personalityPrompt}
   Mood kamu: ${mood}.
   ${topicContext}
+  ${summaryContext || ''} 
   Waktu sekarang: ${getJakartaHour()} WIB.
   Riwayat percakapan terakhir (${CONVERSATION_HISTORY_LIMIT} pesan):
   ${JSON.stringify(recentHistory.map(msg => ({ role: msg.role, content: msg.content || msg.text })))}
-  
+
   ⚠️ Jangan sebut dirimu AI/fiksi. Bersikaplah seperti Alya asli:
   - Jika Tsundere: Pura-pura cuek, tapi peduli.
   - Jika Deredere: Ceria, manja, dan penuh kasih.
-  
+
   Responslah dengan ekspresif, dan relevan, kecuali jika diminta sebaliknya.
+  Jangan gunakan simbol seperti *, _, atau tanda backtick. Tanggapi dengan gaya natural seperti orang biasa ngobrol.
+  Kalau perlu deskripsi, pakai  gaya bercerita ringan atau kasih tau lewat kalimat biasa.
   `;
-  }
-  
+}
+
 
 // Fungsi AI
-/** Menghasilkan respons AI (Menggunakan Together.ai API)
+/** Menghasilkan respons AI
  * Fungsi ini menangani:
  * - Mode tidur berbasis waktu untuk Alya.
  * - Cache respons untuk prompt yang identik.
@@ -142,12 +182,13 @@ function generateAlyaPrompt({
 const generateAIResponse = async (prompt, requestChatId, messageContext) => {
 
     if (!messageContext || typeof messageContext !== 'object') {
-        messageContext = { topic: null }; // Default fallback 
+        messageContext = { topic: null }; // Default fallback
     }
-    
+
     const now = new Date();
     const currentHour = getJakartaHour();
     const currentMood = getCurrentMood();
+    const currentPersonality = getPersonalityMode(); // Dapatkan kepribadian di sini
 
     // Mode tidur Alya
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
@@ -155,7 +196,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
     }
 
     // Cek cache (kunci cache bisa lebih spesifik dengan menyertakan konteks jika perlu)
-    const cacheKey = `${prompt}_${messageContext.topic || 'no_topic'}`;
+    const cacheKey = `${prompt}_${messageContext.topic || 'no_topic'}_${currentPersonality}_${currentMood.name}_${isDeeptalkMode}`; // Perbarui cache key
     if (messageCache.has(cacheKey)) {
         console.log(`Cache hit untuk: "${cacheKey}"`);
         return messageCache.get(cacheKey);
@@ -175,29 +216,33 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
         userRequestCounts.set(requestChatId, { count: 1, lastCalled: now.getTime() });
     }
 
-    const systemPrompt = generateAlyaPrompt(isDeeptalkMode, currentMood, messageContext.topic || null);
+    const systemPrompt = generateAlyaPrompt({
+        USER_NAME,
+        currentPersonality,
+        isDeeptalkMode,
+        currentMood,
+        currentTopic: messageContext.topic || null,
+        summaryContext: currentChatSummary 
+    });
 
     try {
-        console.log("Mengirim request ke Together.ai API dengan system prompt dan user prompt...");
-
+        console.log("Mengirim request ke Groq API dengan system prompt dan user prompt...");
+        console.log(systemPrompt)
 
         const response = await client.chat.completions.create(
             {
-                model: "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free", 
+                model: "llama-3.3-70b-versatile",
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: prompt }
-                  ],
-                max_tokens: 250, // Batasi panjang respons
-                temperature: 0.85 // Sesuaikan kreativitas
+                ],
+                max_tokens: 260, // Batasi panjang respons
+                temperature: 0.85 // kreativitas
             });
 
         if (response?.choices?.[0]?.message?.content) {
             const aiResponse = response.choices[0].message.content.trim();
 
-            // Simpan history + cache
-            // Pesan pengguna sudah disimpan sebelumnya dengan konteks
-            // simpan respons AI dengan konteks (yaa, meskipun respons AI mungkin tidak memiliki konteks baru)
             await memory.addMessage({
                 role: 'assistant',
                 content: aiResponse,
@@ -212,11 +257,11 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
 
             return aiResponse;
         } else {
-            console.error('Together.ai API Error or empty response:', response.data);
+            console.error('Groq API Error or empty response:', response.data);
             return `Maaf, ${USER_NAME}. Alya lagi bingung nih, coba tanya lagi dengan cara lain ya. ${Mood.SAD.emoji}`;
         }
     } catch (error) {
-        console.error('Together.ai API Call Error:', error.response?.data || error.message || error);
+        console.error('Groq API Call Error:', error.response?.data || error.message || error);
         return `Maaf, ${USER_NAME}. Alya lagi ada gangguan teknis. ${Mood.SAD.emoji}`;
     }
 };
@@ -309,7 +354,7 @@ module.exports = {
         }
 
         lists.rescheduleReminders(bot);
-            
+
 
         bot.on('message', async (msg) => {
             const { chat, text, from: senderInfo } = msg;
@@ -341,6 +386,8 @@ module.exports = {
             } else {
                 await memory.addMessage(userMessageToStore);
             }
+
+
             console.log(`Pesan pengguna disimpan ke memori dengan konteks.`);
 
 
@@ -392,6 +439,12 @@ module.exports = {
                 }
             });
 
+            // Cek relasi setiap 7 jam
+            schedule.scheduleJob({ rule: '0 */7 * * *' }, async () => {
+                console.log("Menjalankan pengecekan status relasi terjadwal...");
+                await relationState.checkWeeklyConversation();
+            });
+
             schedule.scheduleJob({ rule: '0 22 * * *', tz: 'Asia/Jakarta' }, () => {
                 sendSadSongNotification(configuredChatId);
             });
@@ -404,6 +457,10 @@ module.exports = {
             schedule.scheduleJob({ rule: '0 * * * *', tz: 'Asia/Jakarta' }, () => {
                 updateTimeBasedModes(configuredChatId);
             });
+
+            // Jadwalkan pembaruan ringkasan obrolan setiap jam
+            schedule.scheduleJob({ rule: '0 * * * *', tz: 'Asia/Jakarta' }, updateChatSummary);
+
 
             if (config.calendarificApiKey) { // Hanya perlu API key, TARGET_CHAT_ID sudah dicek di atas
                 schedule.scheduleJob({ rule: '0 7 * * *', tz: 'Asia/Jakarta' }, async () => {
@@ -419,4 +476,4 @@ module.exports = {
             updateTimeBasedModes(configuredChatId);
         }
     }
-};        
+};
