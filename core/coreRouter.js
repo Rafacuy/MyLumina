@@ -440,4 +440,4 @@
 // };
 
 // UNCOMMENT This file if you uses this.
-// Ctrl + A and Ctrl + /
+// Ctrl + A and Ctrl + / .

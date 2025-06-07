@@ -17,10 +17,9 @@
 const config = require('../config/config'); // File Konfigurasi (API, ChatID, dll)
 const sendMessage = require('../utils/sendMessage'); // Fungsi utilitas (untuk mengirim pesan)
 const memory = require('../data/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
-const contextManager = require('../data/contextManager'); // MEMUAT CONTEXT MANAGER YANG BARU
+const contextManager = require('../data/contextManager'); // MEMUAT CONTEXT MANAGER 
 const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
-// Perhatikan: getPersonalityMode diambil dari commandHandlers
 const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, AlyaTyping, getPersonalityMode } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood, tambahkan getPersonalityMode
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Fungsi dan konstanta cuaca
 const holidaysModule = require('../modules/holidays') // Fungsi buat ngingetin/meriksa apakah sekarang hari penting atau tidak
@@ -28,7 +27,7 @@ const sendSadSongNotification = require('../utils/songNotifier') // Rekomendasi 
 const lists = require('../modules/commandLists') // Untuk init reminder saat startup
 const relationState = require('../modules/relationState'); // Atur poin & level relasi
 const chatSummarizer = require('../modules/chatSummarizer'); // Untuk meringkas riwayat obrolan
-
+const initTtsSchedules = require('../modules/ttsManager').initTtsSchedules;
 
 const Groq = require('groq-sdk') // Import API Endpoints
 
@@ -49,9 +48,9 @@ const client = new Groq({ apiKey: config.groqApiKey });
 
 // Waktu Sholat (untuk zona waktu Asia/Jakarta)
 const PrayerTimes = {
-    Subuh: { hour: 5, minute: 0, emoji: '🌙' },
-    Dzuhur: { hour: 12, minute: 0, emoji: '☀️' },
-    Ashar: { hour: 15, minute: 0, emoji: '⛅' },
+    Subuh: { hour: 4, minute: 40, emoji: '🌙' },
+    Dzuhur: { hour: 11, minute: 45, emoji: '☀️' },
+    Ashar: { hour: 14, minute: 45, emoji: '⛅' },
     Maghrib: { hour: 18, minute: 0, emoji: '🌇' },
     Isya: { hour: 19, minute: 0, emoji: '🌌' }
 };
@@ -288,6 +287,7 @@ function isOnlyNumbers(str) {
     return numberRegex.test(str);
 }
 
+
 /**
  * Membersihkan cache pesan dan memicu penyimpanan memori.
  */
@@ -296,8 +296,6 @@ const cleanupCacheAndMemory = async () => {
     messageCache.clear();
     console.log("Cache pesan dibersihkan.");
 }
-
-
 
 /**
  * Memperbarui kepribadian dan mood Alya berdasarkan waktu saat ini.
@@ -312,22 +310,20 @@ const updateTimeBasedModes = (chatId) => {
     if (currentHour >= DEEPTALK_START_HOUR && !isDeeptalkMode) {
         isDeeptalkMode = true;
         setMood(chatId, Mood.CALM);
-        sendMessage(chatId, `Selamat malam, Tuan ${USER_NAME}. Ada yang ingin diceritakan malam ini? Alya siap mendengarkan. ${Mood.CALM.emoji}`);
         console.log("Memasuki Mode Deeptalk.");
     } else if (currentHour < DEEPTALK_START_HOUR && isDeeptalkMode) {
         isDeeptalkMode = false;
         setMood(chatId, getRandomMood());
-        sendMessage(chatId, `Mode Deeptalk berakhir. Selamat pagi/siang/sore, Tuan ${USER_NAME}! ${getCurrentMood().emoji}`);
         console.log("Keluar dari Mode Deeptalk.");
     }
 
     if (!isDeeptalkMode && !(currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR)) {
         if (currentHour === 7 && currentMood !== Mood.HAPPY) {
             setMood(chatId, Mood.HAPPY);
-            sendMessage(chatId, `Selamat pagi, Tuan~ Alya senang sekali hari ini! Ada yang bisa Alya bantu? ${Mood.HAPPY.emoji}`);
+            console.log('[DEBUG] Waktu sekarang pagi.')
         } else if (currentHour === 13 && currentMood !== Mood.NORMAL) {
             setMood(chatId, Mood.NORMAL);
-            sendMessage(chatId, `Selamat siang, Tuan! Alya siap membantu. ${Mood.NORMAL.emoji}`);
+            console.log('[DEBUG] Waktu sekarang siang.')
         } else if (currentHour === 17) {
             const randomMood = getRandomMood();
             if (currentMood !== randomMood) {
@@ -353,8 +349,9 @@ module.exports = {
             console.warn("⚠️ TARGET_CHAT_ID tidak ditemukan di config.js. Pesan terjadwal TIDAK akan dikirim.");
         }
 
-        lists.rescheduleReminders(bot);
+        lists.rescheduleReminders(bot); // Reschedule reminder
 
+        initTtsSchedules(bot); // inilisasi ttsManager
 
         bot.on('message', async (msg) => {
             const { chat, text, from: senderInfo } = msg;
