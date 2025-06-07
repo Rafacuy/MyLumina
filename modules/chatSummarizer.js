@@ -47,8 +47,6 @@ const summarizeChatHistory = async (chatHistory, maxTokens = 150) => {
             model: "llama-3.1-8b-instant", // Menggunakan model yang sama dengan core.js atau model lain yang cocok
             messages: [
                 { role: 'system', content: systemPrompt },
-                // Menambahkan riwayat obrolan sebagai bagian dari pesan, bisa digabungkan atau dikirim terpisah
-                // Untuk efisiensi, kita bisa mengirim seluruh riwayat sebagai satu pesan user setelah prompt sistem
                 { role: 'user', content: JSON.stringify(formattedHistory) }
             ],
             max_tokens: maxTokens, // Batasi panjang ringkasan

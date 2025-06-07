@@ -4,3 +4,4 @@ archives/
 memory.ndjson.gz
 reminders.json
 notes.json
+relationState.json
