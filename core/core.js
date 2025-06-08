@@ -241,7 +241,6 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
 
     try {
         console.log("Mengirim request ke Groq API dengan system prompt dan user prompt...");
-        console.log(`[DEBUG] SystemPrompt: \n\n ${systemPrompt}`)
 
         const response = await client.chat.completions.create(
             {

@@ -55,12 +55,12 @@ const initTtsSchedules = (bot) => {
 
     // Voice Note Selamat Pagi - 07:00 WIB
     schedule.scheduleJob({ rule: '0 7 * * *', tz: 'Asia/Jakarta' }, () => {
-        sendVoiceFromLocal(bot, chatId, VOICE_NOTE_FILES.selamatPagi, 'Selamat pagi dari Alya~ ✨');
+        sendVoiceFromLocal(bot, chatId, VOICE_NOTE_FILES.selamatPagi, 'Selamat pagi, Tuan~ ayo cepat bangun! hehe, tuanku sangat lucu saat tidur~');
     });
 
     // Voice Note Selamat Siang - 13:00 WIB
     schedule.scheduleJob({ rule: '0 13 * * *', tz: 'Asia/Jakarta' }, () => {
-        sendVoiceFromLocal(bot, chatId, VOICE_NOTE_FILES.selamatSiang, 'Selamat siang dari Alya~ ☀️');
+        sendVoiceFromLocal(bot, chatId, VOICE_NOTE_FILES.selamatSiang, 'Selamat siang~ apakah kamu sudah makan, Tuan?');
     });
 
     // Voice Note Selamat Malam - 21:00 WIB
