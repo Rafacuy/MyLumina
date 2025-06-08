@@ -1,7 +1,7 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 🌸 AlyaBot v7.1 (Optimized) – Productive Assistant
+# 🌸 AlyaBot v8.1 (Optimized) – Productive Assistant
 
 > Telegram ChatBot smart, and act as your assistant.  
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)  
@@ -9,23 +9,21 @@
 
 ---
 
-## ✨ What's New in v7.1?
+## ✨ What's New in v8.1?
 
--  **Super Memory Module!**: Migrate to `.ndjson.gz` format, super light & scalable
-- 💾 **Ring Buffer + Archival**: History auto-archive, no RAM overload
-- 🌙 **Dynamic DeepTalk Mode**: Curhat mode active between 21:00 - 04:00
-- 📦 **Cache, Limit, Schedule, Backup**: Optimize VPS usage & resources
-- 💬 **Custom Command Additions**: More interactive commands (reminder, note, search)
-- 🌐 **Improved Web Search**: Now supports Google Custom Search with your API key
+- **Relation System**: The more you interact with Alya, the more points and levels you will gain.
+- **Context System**: Looking for the context of your conversation with Alya.
+- **LTM (Long-term memory)**: Use keywords like: Favorite food. Favorite movie, etc. and Alya will remember it.
 - **Holidays Information**: Notifying important days / day information
+- **TTS Everyday!**: Alya will send VN every morning, afternoon, evening and prayer time.
 - **Fixed Bugs & Errors**: Now it has been optimized for user convenience.
 
 ---
 
 ## 🔥 Main Features
 
-- 💬 AI ChatBot with OpenRouter (LLaMA, Claude, etc)
-- 🌦️ Weather Info & Personalized Weather Reminders
+- 💬 AI ChatBot with Groq (LLaMA, deepseek, etc)
+- Weather Info & Personalized Weather Reminders
 - 🙏 Automatic Prayer Schedule (Asia/Jakarta)
 - 🎶 Sad Song Recommendations at Night
 - 🎭 Dynamic Mood System (with rate limit and mood reset)
@@ -33,6 +31,7 @@
 - 📝 Personal Notes & Reminders
 - 🔍 Web Search with Google Custom Search
 - 💌 DeepTalk Mode (Deeptalk/calm conversation)
+- Voice Note everyday (Morning, Afternoon, tonight and Prayers time)
 
 ---
 
@@ -89,6 +88,8 @@ GOOGLE_SEARCH_CX=YOUR_CSE_ID # Your google search CSEID
 - `Modify SLEEP_START_HOUR` and `SLEEP_END_HOUR` to set Alya's sleep schedule (default: 00:00 - 04:00).
 - `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS` control the rate limiting behavior.
 - `CONVERSATION_HISTORY_LIMIT` defines how many recent messages are sent to the AI for context (default: 3).
+- You can add preference for LTM Alya.
+- You can modified TTS to your TTS. [voices](./assets/voice/)
 
 ## Usage
 

@@ -1,6 +1,6 @@
 // modules/commandHandlers.js
 
-const sendMessage = require('../utils/sendMessage'); // Utilities for sending messages
+const { sendMessage } = require('../utils/sendMessage'); // Utilities for sending messages
 const commandHelper = require('./commandLists'); // Utilities for commands
 const config = require('../config/config'); // Configuration File
 const Mood = require('./mood');
@@ -297,7 +297,7 @@ const commandHandlers = [
             setPersonalityMode('TSUNDERE');
             return {
                 text: `Hmph, baiklah! Alya akan kembali ke mode Tsundere. Jangan harap aku jadi manis, Idiot! 🔥`,
-                mood: Mood.ANGRY // Atau mood yang sesuai untuk Tsundere
+                mood: Mood.ANGRY 
             };
         }
     },
@@ -307,7 +307,7 @@ const commandHandlers = [
             setPersonalityMode('DEREDERE');
             return {
                 text: `Kyaa~! Oke, Tuan~ Alya akan jadi manis dan ramah untukmu! 🌸`,
-                mood: Mood.HAPPY // Atau mood yang sesuai untuk Deredere
+                mood: Mood.LOVING 
             };
         }
     },
