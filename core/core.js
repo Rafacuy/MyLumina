@@ -15,9 +15,9 @@
 
 // IMPORTANT
 const config = require('../config/config'); // File Konfigurasi (API, ChatID, dll)
-const sendMessage = require('../utils/sendMessage'); // Fungsi utilitas (untuk mengirim pesan)
+const { sendMessage } = require('../utils/sendMessage'); // Fungsi utilitas (untuk mengirim pesan)
 const memory = require('../data/memory'); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
-const contextManager = require('../data/contextManager'); // MEMUAT CONTEXT MANAGER 
+const contextManager = require('../data/contextManager'); // MEMUAT CONTEXT MANAGER
 const schedule = require('node-schedule'); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
 const { getJakartaHour } = require('../utils/timeHelper'); // Fungsi utilitas untuk Zona Waktu
 const { Mood, setMood, getRandomMood, commandHandlers, setBotInstance, getCurrentMood, AlyaTyping, getPersonalityMode } = require('../modules/commandHandlers'); // Fungsi dan konstanta mood, tambahkan getPersonalityMode
@@ -37,7 +37,7 @@ const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
 const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
 const SLEEP_END_HOUR = 4;   // Waktu berakhir tidur Alya (04:00 - 4 pagi)
-const CONVERSATION_HISTORY_LIMIT = 5; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI (dinaikkan sedikit untuk konteks yang lebih baik)
+const CONVERSATION_HISTORY_LIMIT = 4; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI (dinaikkan sedikit untuk konteks yang lebih baik)
 const TOTAL_CONVERSATION_HISTORY_LIMIT = 100; // Batasi jumlah total pesan yang disimpan dalam memori (sesuai memory.js MAX_HISTORY_LENGTH)
 const CACHE_CLEANUP_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000
@@ -56,17 +56,15 @@ const PrayerTimes = {
 };
 
 // Global State Variables
-// Riwayat percakapan sekarang dikelola utamanya oleh memory.js (inMemoryHistory)
-// let conversationHistory = []; // Tidak lagi dikelola secara lokal di core.js
 let messageCache = new Map(); // Mengcache respons AI untuk menghindari panggilan API berlebihan untuk prompt yang identik
 let userRequestCounts = new Map(); // Melacak jumlah permintaan untuk pembatasan laju per pengguna
 let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Alya dalam mode deeptalk
 let currentChatSummary = null; // Untuk menyimpan ringkasan obrolan terbaru
 
-// Memuat riwayat percakapan dari memori saat startup
+// Memuat riwayat percakapan dan memori jangka panjang dari memori saat startup
 memory.load().then(loadedHistory => {
-    // conversationHistory = data || []; // Tidak perlu lagi, memory.js mengelola inMemoryHistory
     console.log(`Memuat ${loadedHistory.length} pesan dari memori (via memory.js).`);
+    // LTM juga dimuat di sini secara internal oleh memory.load()
 }).catch(error => {
     console.error("Kesalahan saat memuat riwayat percakapan dari memori:", error);
 });
@@ -89,7 +87,8 @@ const updateChatSummary = async () => {
 };
 
 /**
- * Menghasilkan prompt sistem untuk AI berdasarkan mode, mood, dan konteks saat ini.
+ * Menghasilkan prompt sistem untuk AI berdasarkan mode, mood, dan konteks saat ini,
+ * termasuk informasi dari memori jangka panjang.
  * @param {object} params - Objek yang berisi semua parameter yang diperlukan.
  * @param {string} params.USER_NAME - Nama pengguna yang berinteraksi dengan Alya.
  * @param {string} params.currentPersonality - Kepribadian Alya saat ini (TSUNDERE/DEREDERE).
@@ -97,6 +96,7 @@ const updateChatSummary = async () => {
  * @param {object} params.currentMood - Objek mood saat ini.
  * @param {string|null} params.currentTopic - Topik percakapan saat ini.
  * @param {string|null} params.summaryContext - Ringkasan obrolan sebelumnya.
+ * @param {object} params.longTermMemory - Objek memori jangka panjang.
  * @returns {string} String prompt sistem.
  */
 function generateAlyaPrompt({
@@ -104,7 +104,8 @@ function generateAlyaPrompt({
     isDeeptalkMode,
     currentMood,
     currentTopic,
-    summaryContext // Menambahkan summaryContext sebagai parameter
+    summaryContext,
+    longTermMemory
 }) {
     const recentHistory = memory.getInMemoryHistory().slice(-CONVERSATION_HISTORY_LIMIT);
     const mood = currentMood?.name?.toLowerCase() || "netral";
@@ -145,11 +146,26 @@ function generateAlyaPrompt({
         }
     }
 
+    // Prefensi user untuk ltm
+    let userPreferences = "";
+    const ltm = longTermMemory;
+    if (Object.keys(ltm).length > 0) {
+        userPreferences += `\nBerikut adalah beberapa hal yang kamu ketahui tentang ${USER_NAME}:\n`;
+        if (ltm.ulangTahun) userPreferences += `- Ulang tahun ${USER_NAME} adalah ${ltm.ulangTahun}.\n`;
+        if (ltm.makananFavorit) userPreferences += `- Makanan favorit ${USER_NAME} adalah ${ltm.makananFavorit}.\n`;
+        if (ltm.filmKesukaan) userPreferences += `- Film kesukaan ${USER_NAME} adalah ${ltm.filmKesukaan}.\n`;
+        if (ltm.musikKesukaan) userPreferences += `- Musik kesukaan ${USER_NAME} adalah ${ltm.musikKesukaan}.\n`;
+        if (ltm.hobi) userPreferences += `- Hobi ${USER_NAME} adalah ${ltm.hobi}.\n`;
+        if (ltm.warnaFavorit) userPreferences += `- Warna favorit ${USER_NAME} adalah ${ltm.warnaFavorit}.\n`;
+        // Tambahkan preferensi lain di sini terserah kebutuhan lu
+    }
+
     return `${basePrompt}
   ${personalityPrompt}
   Mood kamu: ${mood}.
   ${topicContext}
-  ${summaryContext || ''} 
+  ${summaryContext || ''}
+  ${userPreferences}
   Waktu sekarang: ${getJakartaHour()} WIB.
   Riwayat percakapan terakhir (${CONVERSATION_HISTORY_LIMIT} pesan):
   ${JSON.stringify(recentHistory.map(msg => ({ role: msg.role, content: msg.content || msg.text })))}
@@ -158,9 +174,6 @@ function generateAlyaPrompt({
   - Jika Tsundere: Pura-pura cuek, tapi peduli.
   - Jika Deredere: Ceria, manja, dan penuh kasih.
 
-  Responslah dengan ekspresif, dan relevan, kecuali jika diminta sebaliknya.
-  Jangan gunakan simbol seperti *, _, atau tanda backtick. Tanggapi dengan gaya natural seperti orang biasa ngobrol.
-  Kalau perlu deskripsi, pakai  gaya bercerita ringan atau kasih tau lewat kalimat biasa.
   `;
 }
 
@@ -181,13 +194,14 @@ function generateAlyaPrompt({
 const generateAIResponse = async (prompt, requestChatId, messageContext) => {
 
     if (!messageContext || typeof messageContext !== 'object') {
-        messageContext = { topic: null }; // Default fallback
+        messageContext = { topic: null }; // fallback
     }
 
     const now = new Date();
     const currentHour = getJakartaHour();
     const currentMood = getCurrentMood();
-    const currentPersonality = getPersonalityMode(); // Dapatkan kepribadian di sini
+    const currentPersonality = getPersonalityMode();
+    const longTermMemory = memory.getLongTermMemory(); // Ambil memori jangka panjang
 
     // Mode tidur Alya
     if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
@@ -221,12 +235,13 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
         isDeeptalkMode,
         currentMood,
         currentTopic: messageContext.topic || null,
-        summaryContext: currentChatSummary 
+        summaryContext: currentChatSummary,
+        longTermMemory // Teruskan memori jangka panjang ke fungsi prompt
     });
 
     try {
         console.log("Mengirim request ke Groq API dengan system prompt dan user prompt...");
-        console.log(systemPrompt)
+        console.log(`[DEBUG] SystemPrompt: \n\n ${systemPrompt}`)
 
         const response = await client.chat.completions.create(
             {
@@ -334,6 +349,57 @@ const updateTimeBasedModes = (chatId) => {
     }
 };
 
+/**
+ * Menganalisis pesan pengguna untuk menyimpan preferensi ke long-term memory.
+ * Ini versi modular dan fleksibel.
+ * @param {string} text - Pesan dari user.
+ */
+const analyzeAndSavePreferences = (text) => {
+    if (typeof text !== 'string') return;
+
+    const lowerText = text.toLowerCase();
+    const normalizedText = lowerText.replace(/\b(kesukaan|favorit)\s+ku\b/g, '$1ku');
+
+    // Daftar preferensi dan pola regex-nya
+    const preferencePatterns = [
+        {
+            key: 'ulangTahun',
+            regex: /(ulang tahun(?:ku)?|ultah(?:ku)?|lahir(?:ku)?)\s*(?:tanggal|pada)?\s*([\d]{1,2}(?:\s+\w+)?(?:\s+\d{4})?)/
+        },
+        {
+            key: 'makananFavorit',
+            regex: /(makanan(?: favoritku| kesukaanku| yang aku suka)?)\s*(?:adalah|itu|:)?\s*(.+)/
+        },
+        {
+            key: 'filmKesukaan',
+            regex: /(film(?: favoritku| kesukaanku| yang aku suka)?)\s*(?:adalah|itu|:)?\s*(.+)/
+        },
+        {
+            key: 'musikKesukaan',
+            regex: /((?:musik|lagu)(?: favoritku| kesukaanku| yang aku suka)?)\s*(?:adalah|itu|:)?\s*(.+)/
+        },
+        {
+            key: 'hobi',
+            regex: /(hobiku|suka banget|senang(?: melakukan)?|hobi(?:ku)?)\s*(?:adalah|itu|:)?\s*(.+)/
+        },
+        {
+            key: 'warnaFavorit',
+            regex: /(warna(?: favoritku| kesukaanku| yang aku suka)?)\s*(?:adalah|itu|:)?\s*(.+)/
+        },
+        // Tambah preferensi baru di sini gampang tinggal push ke array
+    ];
+
+    for (const { key, regex } of preferencePatterns) {
+        const match = normalizedText.match(regex);
+        if (match && match[2]) {
+            const value = match[2].trim();
+            memory.savePreference(key, value);
+            console.log(`[LTM] Disimpan: ${key} = ${value}`);
+        }
+    }
+};
+
+
 
 module.exports = {
     USER_NAME,
@@ -360,6 +426,11 @@ module.exports = {
             // Validasi
             if (!text || text.trim() === "") return;
             if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text))) return;
+
+            // Analisis pesan untuk preferensi dan simpan ke long-term memory
+            if (senderInfo && senderInfo.first_name === USER_NAME) {
+                analyzeAndSavePreferences(text);
+            }
 
             const messageContext = contextManager.analyzeMessage(msg);
 
@@ -391,7 +462,6 @@ module.exports = {
             if (messageContext.autoReply) {
                 await AlyaTyping(currentMessageChatId);
                 sendMessage(currentMessageChatId, messageContext.autoReply);
-                // Simpan juga auto-reply Alya ke memori jika perlu
                 await memory.addMessage({
                     role: 'assistant',
                     content: messageContext.autoReply,
@@ -399,7 +469,7 @@ module.exports = {
                     chatId: currentMessageChatId,
                     context: { topic: messageContext.topic, tone: 'auto_reply' } // Konteks untuk balasan otomatis
                 });
-                return; // Hentikan proses jika auto-reply sudah dikirim
+                return;
             }
 
             for (const handler of commandHandlers) {
@@ -408,7 +478,6 @@ module.exports = {
                     await AlyaTyping(currentMessageChatId);
                     if (result.text) sendMessage(currentMessageChatId, result.text);
                     if (result.mood) setMood(currentMessageChatId, result.mood);
-                    // Pertimbangkan untuk menyimpan output perintah ke memori juga jika relevan
                     return;
                 }
             }
