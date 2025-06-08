@@ -10,40 +10,43 @@
 const fs = require('fs').promises;
 const path = require('path');
 const zlib = require('zlib');
-const config = require('../config/config')
+const config = require('../config/config');
 
 // --- Configuration Constants ---
-const MEMORY_FILE = path.join(__dirname, 'memory.ndjson.gz'); // Main active memory file, now NDJSON and gzipped
-const BACKUP_DIR = path.join(__dirname, 'backups'); // Directory for temporary backups of MEMORY_FILE
-const ARCHIVE_DIR = path.join(__dirname, 'archives'); // New directory for older, archived chats
-const MAX_HISTORY_LENGTH = 100; // Maximum number of messages to keep in active in-memory history (ring buffer)
-const ARCHIVE_THRESHOLD = 90; // When in-memory history reaches this length, oldest messages are archived
-const ARCHIVE_CHUNK_SIZE = 50; // Number of messages to move to archive when threshold is met
-const BACKUP_RETENTION = 3; // Number of recent 'memory.ndjson.gz' backups to keep
-const TARGET_USER_NAME = config.USER_NAME; // Username for specific chat saving logic
+const MEMORY_FILE = path.join(__dirname, 'memory.ndjson.gz'); // File memori aktif utama, sekarang NDJSON dan gzipped
+const LONG_TERM_MEMORY_FILE = path.join(__dirname, 'longTermMemory.json'); // File untuk memori jangka panjang
+const BACKUP_DIR = path.join(__dirname, 'backups'); // Direktori untuk backup sementara MEMORY_FILE
+const ARCHIVE_DIR = path.join(__dirname, 'archives'); // Direktori baru untuk obrolan lama yang diarsipkan
+const MAX_HISTORY_LENGTH = 100; // Jumlah maksimum pesan yang disimpan dalam riwayat in-memory aktif (ring buffer)
+const ARCHIVE_THRESHOLD = 90; // Ketika riwayat in-memory mencapai panjang ini, pesan terlama diarsipkan
+const ARCHIVE_CHUNK_SIZE = 50; // Jumlah pesan yang dipindahkan ke arsip ketika ambang batas terpenuhi
+const BACKUP_RETENTION = 3; // Jumlah backup 'memory.ndjson.gz' terbaru yang akan disimpan
+const TARGET_USER_NAME = config.USER_NAME; // Nama pengguna untuk logika penyimpanan obrolan spesifik
 
 // --- Global State Variables ---
-let inMemoryHistory = []; // The fixed-size queue (ring buffer) for active conversation history
-let saveQueue = Promise.resolve(); // A promise chain to ensure sequential write operations
-let isDirty = false; // Flag to indicate if inMemoryHistory has unsaved changes, triggering a flush
+let inMemoryHistory = []; // Antrean berukuran tetap (ring buffer) untuk riwayat percakapan aktif
+let longTermMemory = {}; // Objek untuk memori jangka panjang
+let saveQueue = Promise.resolve(); // Rantai promise untuk memastikan operasi tulis berurutan
+let isDirty = false; // Flag untuk menunjukkan apakah inMemoryHistory memiliki perubahan yang belum disimpan
+let isLongTermMemoryDirty = false; // Flag untuk menunjukkan apakah longTermMemory memiliki perubahan yang belum disimpan
 
 // --- Helper Functions ---
 
 /**
- * Validates if an object is a valid history entry (minimally, has a 'content' property).
- * @param {object} entry The object to validate.
- * @returns {boolean} True if valid, false otherwise.
+ * Memvalidasi apakah objek adalah entri riwayat yang valid (minimal memiliki properti 'content').
+ * @param {object} entry Objek yang akan divalidasi.
+ * @returns {boolean} True jika valid, false jika tidak.
  */
 const validateHistoryEntry = (entry) => {
     return typeof entry === 'object' && entry !== null && 'content' in entry;
 };
 
 /**
- * Writes an array of messages to a file in NDJSON format and compresses it with Gzip.
- * Each message object is stringified to a single line, separated by newlines.
- * @param {string} filePath The full path to the file to write.
- * @param {Array<object>} messages An array of message objects.
- * @returns {Promise<void>} A promise that resolves when the file is written.
+ * Menulis array pesan ke file dalam format NDJSON dan mengompresnya dengan Gzip.
+ * Setiap objek pesan di-stringifikasi ke satu baris, dipisahkan oleh baris baru.
+ * @param {string} filePath Jalur lengkap ke file yang akan ditulis.
+ * @param {Array<object>} messages Array objek pesan.
+ * @returns {Promise<void>} Promise yang akan diselesaikan ketika file selesai ditulis.
  */
 const writeNdjsonGz = async (filePath, messages) => {
     const ndjsonContent = messages.map(msg => JSON.stringify(msg)).join('\n');
@@ -52,42 +55,70 @@ const writeNdjsonGz = async (filePath, messages) => {
 };
 
 /**
- * Reads messages from a Gzipped NDJSON file, decompresses it, and parses each line.
- * @param {string} filePath The full path to the file to read.
- * @returns {Promise<Array<object>>} A promise that resolves to an array of parsed message objects.
+ * Membaca pesan dari file NDJSON yang di-Gzip, menguraikannya, dan mem-parse setiap baris.
+ * @param {string} filePath Jalur lengkap ke file yang akan dibaca.
+ * @returns {Promise<Array<object>>} Promise yang akan diselesaikan ke array objek pesan yang di-parse.
  */
 const readNdjsonGz = async (filePath) => {
     try {
         const compressedData = await fs.readFile(filePath);
         const data = zlib.gunzipSync(compressedData).toString('utf8');
-        // Filter out empty lines that might result from trailing newlines
+        // Filter baris kosong yang mungkin dihasilkan dari trailing newlines
         return data.split('\n').filter(line => line.trim() !== '').map(line => JSON.parse(line));
     } catch (error) {
-        // If the file doesn't exist, return an empty array instead of throwing an error
+        // Jika file tidak ada, kembalikan array kosong daripada melempar error
         if (error.code === 'ENOENT') {
             return [];
         }
-        throw error; // Re-throw other errors
+        throw error; // Lempar ulang error lainnya
     }
 };
 
 /**
- * Rotates backups in the BACKUP_DIR, keeping only the most recent `BACKUP_RETENTION` files.
- * @returns {Promise<void>} A promise that resolves when old backups are deleted.
+ * Membaca data memori jangka panjang dari file JSON.
+ * @param {string} filePath Jalur lengkap ke file JSON.
+ * @returns {Promise<object>} Promise yang akan diselesaikan ke objek data memori jangka panjang.
+ */
+const readJson = async (filePath) => {
+    try {
+        const data = await fs.readFile(filePath, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            return {}; // Jika file tidak ada, kembalikan objek kosong
+        }
+        console.error('Error reading JSON file:', error);
+        return {}; // Kembalikan objek kosong jika ada error lain
+    }
+};
+
+/**
+ * Menulis data memori jangka panjang ke file JSON.
+ * @param {string} filePath Jalur lengkap ke file JSON.
+ * @param {object} data Objek data yang akan ditulis.
+ * @returns {Promise<void>} Promise yang akan diselesaikan ketika file selesai ditulis.
+ */
+const writeJson = async (filePath, data) => {
+    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+};
+
+/**
+ * Merotasi backup di BACKUP_DIR, hanya menyimpan file `BACKUP_RETENTION` terbaru.
+ * @returns {Promise<void>} Promise yang akan diselesaikan ketika backup lama dihapus.
  */
 const rotateBackups = async () => {
     try {
         const files = await fs.readdir(BACKUP_DIR);
         const backups = files
             .filter(f => f.startsWith('memory_backup_') && f.endsWith('.ndjson.gz'))
-            .sort() // Sort alphabetically (which works for ISO timestamps)
-            .reverse(); // Get most recent first
+            .sort() // Urutkan secara alfabetis (yang berfungsi untuk timestamp ISO)
+            .reverse(); // Dapatkan yang terbaru terlebih dahulu
 
-        const toDelete = backups.slice(BACKUP_RETENTION); // Identify backups to delete
+        const toDelete = backups.slice(BACKUP_RETENTION); // Identifikasi backup yang akan dihapus
 
         for (const file of toDelete) {
             await fs.unlink(path.join(BACKUP_DIR, file));
-            // console.log(`Deleted old backup: ${file}`); // Uncomment for verbose logging
+            // console.log(`Deleted old backup: ${file}`); // Uncomment untuk logging verbose
         }
     } catch (error) {
         console.error('Error rotating backups:', error);
@@ -97,31 +128,34 @@ const rotateBackups = async () => {
 // --- Core Memory Management Functions ---
 
 /**
- * Loads the active conversation history from MEMORY_FILE into inMemoryHistory.
- * If MEMORY_FILE is not found or corrupted, it attempts to load from the most recent backup.
- * Initializes the inMemoryHistory array.
- * @returns {Promise<Array<object>>} A promise that resolves to the loaded history.
+ * Memuat riwayat percakapan aktif dari MEMORY_FILE dan memori jangka panjang dari LONG_TERM_MEMORY_FILE.
+ * Jika file tidak ditemukan atau rusak, ia mencoba memuat dari backup (untuk history) atau memulai dengan kosong (untuk long-term memory).
+ * Menginisialisasi array inMemoryHistory dan objek longTermMemory.
+ * @returns {Promise<Array<object>>} Promise yang akan diselesaikan ke riwayat yang dimuat.
  */
 const load = async () => {
-    // Ensure no pending save operations interfere with loading
     return saveQueue.then(async () => {
         try {
-            // Ensure necessary directories exist before attempting to read/write
+            // Pastikan direktori yang diperlukan ada sebelum mencoba membaca/menulis
             await fs.mkdir(ARCHIVE_DIR, { recursive: true });
             await fs.mkdir(BACKUP_DIR, { recursive: true });
 
-            // Attempt to load the main active memory file
+            // Coba muat file memori aktif utama
             const loadedMessages = await readNdjsonGz(MEMORY_FILE);
-            // Filter out any invalid entries and ensure it doesn't exceed max length
+            // Saring entri yang tidak valid dan pastikan tidak melebihi panjang maksimum
             inMemoryHistory = loadedMessages.filter(validateHistoryEntry).slice(-MAX_HISTORY_LENGTH);
+            console.log(`Memuat ${inMemoryHistory.length} pesan ke memori aktif dari ${MEMORY_FILE}.`);
+            isDirty = false; // Riwayat sekarang sinkron dengan disk
 
-            console.log(`Loaded ${inMemoryHistory.length} messages into active memory from ${MEMORY_FILE}.`);
-            isDirty = false; // History is now in sync with disk
+            // Muat memori jangka panjang
+            longTermMemory = await readJson(LONG_TERM_MEMORY_FILE);
+            console.log(`Memuat memori jangka panjang dari ${LONG_TERM_MEMORY_FILE}.`);
+            isLongTermMemoryDirty = false;
 
             return inMemoryHistory;
         } catch (error) {
-            console.error(`Error loading main memory file (${MEMORY_FILE}):`, error);
-            // If main file fails, try to load from the most recent backup
+            console.error(`Error loading memory files:`, error);
+            // Jika file utama gagal, coba muat dari backup (hanya untuk riwayat obrolan)
             try {
                 const backupFiles = (await fs.readdir(BACKUP_DIR))
                     .filter(f => f.startsWith('memory_backup_') && f.endsWith('.ndjson.gz'))
@@ -130,118 +164,127 @@ const load = async () => {
 
                 if (backupFiles.length > 0) {
                     const backupPath = path.join(BACKUP_DIR, backupFiles[0]);
-                    console.log(`Attempting to load from backup: ${backupPath}`);
+                    console.log(`Mencoba memuat dari backup: ${backupPath}`);
                     const backupMessages = await readNdjsonGz(backupPath);
                     inMemoryHistory = backupMessages.filter(validateHistoryEntry).slice(-MAX_HISTORY_LENGTH);
-                    console.log(`Successfully loaded ${inMemoryHistory.length} messages from backup.`);
-                    isDirty = true; // Mark dirty so this recovered state is saved to main file
-                    return inMemoryHistory;
+                    console.log(`Berhasil memuat ${inMemoryHistory.length} pesan dari backup.`);
+                    isDirty = true; // Tandai kotor agar status yang dipulihkan ini disimpan ke file utama
                 }
             } catch (backupError) {
                 console.error('Error loading from backup:', backupError);
             }
-            // If all loading attempts fail, start with an empty history
-            console.warn('Could not load memory or backup. Starting with an empty history.');
+            // Jika semua upaya pemuatan gagal, mulai dengan riwayat kosong dan memori jangka panjang kosong
+            console.warn('Tidak dapat memuat memori atau backup. Memulai dengan riwayat dan memori jangka panjang kosong.');
             inMemoryHistory = [];
-            isDirty = true; // Mark dirty to ensure an empty file is saved
+            longTermMemory = {};
+            isDirty = true; // Tandai kotor untuk memastikan file kosong disimpan
+            isLongTermMemoryDirty = true;
             return [];
         }
     });
 };
 
 /**
- * Flushes the in-memory history to disk. This function handles:
- * 1. Archiving older messages if the history size exceeds the threshold.
- * 2. Creating a backup of the current active memory.
- * 3. Writing the current active memory to the main MEMORY_FILE.
- * 4. Rotating old backups.
- * This function is designed to be called periodically (e.g., via setInterval).
- * @returns {Promise<boolean>} A promise that resolves to true if flush was successful, false otherwise.
+ * Membersihkan riwayat in-memory ke disk. Fungsi ini menangani:
+ * 1. Mengarsipkan pesan yang lebih lama jika ukuran riwayat melebihi ambang batas.
+ * 2. Membuat backup memori aktif saat ini.
+ * 3. Menulis memori aktif saat ini ke MEMORY_FILE utama.
+ * 4. Merotasi backup lama.
+ * 5. Menyimpan memori jangka panjang jika ada perubahan.
+ * Fungsi ini dirancang untuk dipanggil secara berkala (misalnya, melalui setInterval).
+ * @returns {Promise<boolean>} Promise yang akan diselesaikan ke true jika pembersihan berhasil, false jika tidak.
  */
 const flush = async () => {
-    if (!isDirty) {
-        return true; // Indicate success as nothing needed to be saved
+    if (!isDirty && !isLongTermMemoryDirty) {
+        return true; // Menunjukkan keberhasilan karena tidak ada yang perlu disimpan
     }
 
-    // Use saveQueue to ensure only one flush operation runs at a time
+    // Gunakan saveQueue untuk memastikan hanya satu operasi flush yang berjalan pada satu waktu
     saveQueue = saveQueue.then(async () => {
         try {
-            // 1. Handle Archiving: If history is nearing its limit, move oldest messages to an archive file
+            // 1. Tangani Pengarsipan: Jika riwayat mendekati batasnya, pindahkan pesan terlama ke file arsip
             if (inMemoryHistory.length >= ARCHIVE_THRESHOLD) {
                 const messagesToArchive = inMemoryHistory.slice(0, ARCHIVE_CHUNK_SIZE);
-                inMemoryHistory = inMemoryHistory.slice(ARCHIVE_CHUNK_SIZE); // Remove archived messages from active memory
+                inMemoryHistory = inMemoryHistory.slice(ARCHIVE_CHUNK_SIZE); // Hapus pesan yang diarsipkan dari memori aktif
 
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const archiveFile = path.join(ARCHIVE_DIR, `archive_${timestamp}.ndjson.gz`);
                 await writeNdjsonGz(archiveFile, messagesToArchive);
-                console.log(`Archived ${messagesToArchive.length} messages to ${archiveFile}`);
+                console.log(`Mengarsipkan ${messagesToArchive.length} pesan ke ${archiveFile}`);
             }
 
-            // 2. Create a backup of the current active memory before writing to the main file
+            // 2. Buat backup dari memori aktif saat ini sebelum menulis ke file utama
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const backupFile = path.join(BACKUP_DIR, `memory_backup_${timestamp}.ndjson.gz`);
             await writeNdjsonGz(backupFile, inMemoryHistory);
-            // console.log(`Created backup: ${backupFile}`); // Uncomment for verbose logging
+            // console.log(`Membuat backup: ${backupFile}`); // Uncomment untuk logging verbose
 
-            // 3. Write current active memory to the main file
+            // 3. Tulis memori aktif saat ini ke file utama
             await writeNdjsonGz(MEMORY_FILE, inMemoryHistory);
-            console.log(`Saved active memory to ${MEMORY_FILE}. Current size: ${inMemoryHistory.length}`);
+            console.log(`Menyimpan memori aktif ke ${MEMORY_FILE}. Ukuran saat ini: ${inMemoryHistory.length}`);
 
-            // 4. Rotate backups to manage disk space
+            // 4. Rotasi backup untuk mengelola ruang disk
             await rotateBackups();
 
-            isDirty = false; // Reset dirty flag after successful save
+            // 5. Simpan memori jangka panjang jika ada perubahan
+            if (isLongTermMemoryDirty) {
+                await writeJson(LONG_TERM_MEMORY_FILE, longTermMemory);
+                console.log(`Memori jangka panjang disimpan ke ${LONG_TERM_MEMORY_FILE}.`);
+                isLongTermMemoryDirty = false;
+            }
+
+            isDirty = false; // Reset flag kotor setelah berhasil menyimpan
             return true;
         } catch (error) {
             console.error('Error during memory flush:', error);
             return false;
         }
     });
-    return saveQueue; // Return the promise so other operations can chain after the flush completes
+    return saveQueue; // Kembalikan promise agar operasi lain dapat berantai setelah flush selesai
 };
 
 /**
- * Adds a new message to the in-memory history (ring buffer).
- * If the history exceeds MAX_HISTORY_LENGTH, the oldest message is removed.
- * This function only modifies the in-memory state and sets the `isDirty` flag.
- * Actual saving to disk happens via the `flush` function.
- * @param {object} message The message object to add.
- * @returns {Array<object>} The updated in-memory history.
+ * Menambahkan pesan baru ke riwayat in-memory (ring buffer).
+ * Jika riwayat melebihi MAX_HISTORY_LENGTH, pesan terlama dihapus.
+ * Fungsi ini hanya memodifikasi status in-memory dan mengatur flag `isDirty`.
+ * Penyimpanan aktual ke disk terjadi melalui fungsi `flush`.
+ * @param {object} message Objek pesan yang akan ditambahkan.
+ * @returns {Array<object>} Riwayat in-memory yang diperbarui.
  */
 const addMessage = async (message) => {
     if (!validateHistoryEntry(message)) {
-        console.warn('Attempted to add invalid message to history:', message);
-        return inMemoryHistory; // Return current history without modification
+        console.warn('Mencoba menambahkan pesan tidak valid ke riwayat:', message);
+        return inMemoryHistory; // Kembalikan riwayat saat ini tanpa modifikasi
     }
     inMemoryHistory.push(message);
     if (inMemoryHistory.length > MAX_HISTORY_LENGTH) {
-        inMemoryHistory.shift(); // Remove the oldest message to maintain fixed size
+        inMemoryHistory.shift(); // Hapus pesan terlama untuk mempertahankan ukuran tetap
     }
-    isDirty = true; // Mark memory as having unsaved changes
+    isDirty = true; // Tandai memori memiliki perubahan yang belum disimpan
     return inMemoryHistory;
 };
 
 /**
- * Retrieves the last chat message sent by a specific user from the in-memory history.
- * @param {string} userName The name of the user to search for.
- * @returns {object|null} The last message object from the specified user, or null if not found.
+ * Mengambil pesan obrolan terakhir yang dikirim oleh pengguna tertentu dari riwayat in-memory.
+ * @param {string} userName Nama pengguna yang akan dicari.
+ * @returns {object|null} Objek pesan terakhir dari pengguna yang ditentukan, atau null jika tidak ditemukan.
  */
 const getLastChatBy = async (userName) => {
-    // Iterate backwards to find the most recent message quickly
+    // Iterasi mundur untuk menemukan pesan terbaru dengan cepat
     for (let i = inMemoryHistory.length - 1; i >= 0; i--) {
         if (inMemoryHistory[i].from && inMemoryHistory[i].from.first_name === userName) {
             return inMemoryHistory[i];
         }
     }
-    return null; // No message found from the specified user
+    return null; // Tidak ada pesan yang ditemukan dari pengguna yang ditentukan
 };
 
 /**
- * Saves the last chat message if it's from the TARGET_USER_NAME.
- * This function ensures that only the most recent message from the target user is kept in history.
- * It leverages `addMessage` for the actual addition and size management.
- * @param {object} message The incoming message object.
- * @returns {Promise<void>} A promise that resolves when the operation is complete.
+ * Menyimpan pesan obrolan terakhir jika itu dari TARGET_USER_NAME.
+ * Fungsi ini memastikan bahwa hanya pesan terbaru dari pengguna target yang disimpan dalam riwayat.
+ * Ini memanfaatkan `addMessage` untuk penambahan aktual dan manajemen ukuran.
+ * @param {object} messageObject Objek pesan yang masuk.
+ * @returns {Promise<void>} Promise yang akan diselesaikan ketika operasi selesai.
  */
 const saveLastChat = async (messageObject) => { // messageObject adalah objek lengkap dari core.js
     try {
@@ -257,53 +300,93 @@ const saveLastChat = async (messageObject) => { // messageObject adalah objek le
             // Tambahkan messageObject baru yang sudah berisi konteks
             await addMessage(messageObject); // Gunakan addMessage internal untuk konsistensi
         }
-        // Jika bukan TARGET_USER_NAME, mungkin tidak melakukan apa-apa atau logika lain
+    
     } catch (error) {
         console.error('Error saving last chat in memory.js:', error);
     }
 };
 
 /**
- * Searches the in-memory history for messages containing a specific keyword.
- * @param {string} keyword The keyword to search for (case-insensitive).
- * @param {number} limit The maximum number of results to return.
- * @returns {Promise<Array<object>>} A promise that resolves to an array of matching message objects.
+ * Mencari riwayat in-memory untuk pesan yang berisi kata kunci tertentu.
+ * @param {string} keyword Kata kunci yang akan dicari (tidak peka huruf besar/kecil).
+ * @param {number} limit Jumlah maksimum hasil yang akan dikembalikan.
+ * @returns {Promise<Array<object>>} Promise yang akan diselesaikan ke array objek pesan yang cocok.
  */
 const searchHistory = async (keyword, limit = 5) => {
     const results = [];
-    // Search in-memory history from newest to oldest
+    // Cari di riwayat in-memory dari yang terbaru ke terlama
     for (let i = inMemoryHistory.length - 1; i >= 0 && results.length < limit; i--) {
         if (inMemoryHistory[i].content && inMemoryHistory[i].content.toLowerCase().includes(keyword.toLowerCase())) {
-            results.unshift(inMemoryHistory[i]); // Add to the beginning to maintain chronological order
+            results.unshift(inMemoryHistory[i]); // Tambahkan ke awal untuk mempertahankan urutan kronologis
         }
     }
-    // Note: This function currently only searches the active in-memory history.
-    // To search archives, additional logic would be required to read and process archive files.
+
     return results;
+};
+
+/**
+ * Menyimpan preferensi pengguna ke memori jangka panjang.
+ * @param {string} key Kunci preferensi (misalnya, 'ulangTahun', 'makananFavorit').
+ * @param {string} value Nilai preferensi.
+ */
+const savePreference = (key, value) => {
+    longTermMemory[key] = value;
+    isLongTermMemoryDirty = true;
+    console.log(`Preferensi '${key}' disimpan: ${value}`);
+};
+
+/**
+ * Mengambil preferensi pengguna dari memori jangka panjang.
+ * @param {string} key Kunci preferensi.
+ * @returns {string|undefined} Nilai preferensi, atau undefined jika tidak ditemukan.
+ */
+const getPreference = (key) => {
+    return longTermMemory[key];
+};
+
+/**
+ * Menghapus preferensi pengguna dari memori jangka panjang.
+ * @param {string} key Kunci preferensi yang akan dihapus.
+ * @returns {boolean} True jika preferensi berhasil dihapus, false jika tidak ditemukan.
+ */
+const deletePreference = (key) => {
+    if (longTermMemory.hasOwnProperty(key)) {
+        delete longTermMemory[key];
+        isLongTermMemoryDirty = true;
+        console.log(`Preferensi '${key}' dihapus.`);
+        return true;
+    }
+    console.warn(`Preferensi '${key}' tidak ditemukan untuk dihapus.`);
+    return false;
 };
 
 // --- Module Exports ---
 module.exports = {
     load,
-    save: flush, // Expose `flush` as `save` for external calls 
+    save: flush, // Expose `flush` as `save` for external calls
     addMessage,
     searchHistory,
     getLastChatBy,
     saveLastChat,
-    // Helper to get the current in-memory history for other modules 
-    getInMemoryHistory: () => inMemoryHistory
+    savePreference, 
+    getPreference,  
+    deletePreference, 
+    // Helper untuk mendapatkan riwayat in-memory saat ini untuk modul lain
+    getInMemoryHistory: () => inMemoryHistory,
+    // Helper untuk mendapatkan memori jangka panjang
+    getLongTermMemory: () => longTermMemory
 };
 
 // --- Initialization and Timed Flush Setup ---
 
-// Load history when the module is first required
+// Muat riwayat ketika modul pertama kali diperlukan
 load().then(() => {
-    console.log('Memory module initialized and history loaded successfully.');
+    console.log('Modul memori diinisialisasi dan riwayat dimuat dengan sukses.');
 }).catch(err => {
-    console.error('Failed to initialize memory module on startup:', err);
+    console.error('Gagal menginisialisasi modul memori saat startup:', err);
 });
 
-// Set up periodic flush to save changes to disk every 30 seconds
+// Atur pembersihan berkala untuk menyimpan perubahan ke disk setiap 30 detik
 setInterval(() => {
-    module.exports.save(); // Call the flush function
-}, 30 * 1000); // 30 seconds interval
+    module.exports.save(); // Panggil fungsi flush
+}, 30 * 1000); // Interval 30 detik

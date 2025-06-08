@@ -24,11 +24,11 @@ const LEVEL_THRESHOLDS = {
 
 // Deskripsi untuk setiap level
 const LEVEL_DESCRIPTIONS = {
-    1: "Hanya sebatas teman dengan respon cuek. (Level 1)",
-    2: "Respon sekarang rada nggak cuek dan juga mulai menunjukkan kepedulian. (Level 2)",
-    3: "Alya jadi sabar dan peduli ke tuan. (Level 3)",
-    4: "Alya jadi lebih sayang dan cinta ke Tuan. (Level 4)",
-    5: "Alya jadi makin sayang dan sangat peduli ke Tuan. (Level 5)"
+    1: "Asisten pembantu dan cuek.",
+    2: "Teman dekat",
+    3: "Sahabat tersayang",
+    4: "Pacar",
+    5: "Pacar tersayang"
 };
 
 // --- State Internal ---
