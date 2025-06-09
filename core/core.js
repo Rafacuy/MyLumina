@@ -94,7 +94,7 @@ const updateChatSummary = async () => {
  * @param {string} params.currentPersonality - Kepribadian Alya saat ini (TSUNDERE/DEREDERE).
  * @param {boolean} params.isDeeptalkMode - True jika dalam mode deeptalk.
  * @param {object} params.currentMood - Objek mood saat ini.
- * @param {string|null} params.currentTopic - Topik percakapan saat ini.
+ * @param {string|null} params.param.currentTopic - Topik percakapan saat ini.
  * @param {string|null} params.summaryContext - Ringkasan obrolan sebelumnya.
  * @param {object} params.longTermMemory - Objek memori jangka panjang.
  * @returns {string} String prompt sistem.
@@ -170,9 +170,8 @@ function generateAlyaPrompt({
   Riwayat percakapan terakhir (${CONVERSATION_HISTORY_LIMIT} pesan):
   ${JSON.stringify(recentHistory.map(msg => ({ role: msg.role, content: msg.content || msg.text })))}
 
-  ⚠️ Jangan sebut dirimu AI/fiksi. Bersikaplah seperti Alya asli:
-  - Jika Tsundere: Pura-pura cuek, tapi peduli.
-  - Jika Deredere: Ceria, manja, dan penuh kasih.
+   Jangan sebut dirimu AI/fiksi. Bersikaplah seperti Alya asli.
+  Sesuaikan responmu dengan ${USER_NAME}.
 
   `;
 }
@@ -261,7 +260,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
                 content: aiResponse,
                 timestamp: new Date().toISOString(),
                 chatId: requestChatId,
-                // Konteks untuk respons AI bisa di-set null (atau di warisi jika relevan)
+                // Konteks untuk respons AI bisa di-set null (atau  warisi jika relevan)
                 context: { topic: messageContext.topic, tone: 'assistant_response' }
             });
 
@@ -385,7 +384,7 @@ const analyzeAndSavePreferences = (text) => {
             key: 'warnaFavorit',
             regex: /(warna(?: favoritku| kesukaanku| yang aku suka)?)\s*(?:adalah|itu|:)?\s*(.+)/
         },
-        // Tambah preferensi baru di sini gampang tinggal push ke array
+        // Tambah preferensi baru di sini gampang tinggal push ke array (lu bisa kan tai)
     ];
 
     for (const { key, regex } of preferencePatterns) {
@@ -426,13 +425,19 @@ module.exports = {
             if (!text || text.trim() === "") return;
             if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text))) return;
 
-            // Analisis pesan untuk preferensi dan simpan ke long-term memory
-            if (senderInfo && senderInfo.first_name === USER_NAME) {
-                analyzeAndSavePreferences(text);
-            }
+            analyzeAndSavePreferences(text);
+
 
             const messageContext = contextManager.analyzeMessage(msg);
 
+            // Analisis pesan untuk preferensi dan simpan ke long-term memory
+            // Hapus kondisi 'if (senderInfo && senderInfo.first_name === USER_NAME)'
+            // Karena dihapus, log debug di bawah ini akan selalu muncul (jika fungsi addPointOnMessage dipanggil)
+            console.log(`[DEBUG - Core] Pesan dari pengirim apa pun terdeteksi. Poin akan ditambahkan.`); // <-- Log debug baru
+            console.log(`[DEBUG - Core] Nilai USER_NAME di config: "${USER_NAME}"`);
+            console.log(`[DEBUG - Core] Nilai senderInfo.first_name dari pesan: "${senderInfo.first_name}"`);
+
+            await relationState.addPointOnMessage(); // Panggilan ini sekarang akan selalu dieksekusi untuk setiap pesan
 
             // Buat objek pesan yang akan disimpan
             const userMessageToStore = {
@@ -446,14 +451,7 @@ module.exports = {
                 context: messageContext // Simpan konteks yang dianalisis
             };
 
-            // Jika TARGET_USER_NAME cocok, gunakan saveLastChat, jika tidak, gunakan addMessage
-            // memory.js akan menangani logika penyimpanan spesifik ini
-            if (senderInfo && senderInfo.first_name === USER_NAME) { // Asumsi USER_NAME adalah target untuk saveLastChat
-                await memory.saveLastChat(userMessageToStore); // saveLastChat di memory.js mungkin perlu disesuaikan untuk menerima objek penuh
-            } else {
-                await memory.addMessage(userMessageToStore);
-            }
-
+            await memory.saveLastChat(userMessageToStore);
 
             console.log(`Pesan pengguna disimpan ke memori dengan konteks.`);
 
@@ -466,14 +464,14 @@ module.exports = {
                     content: messageContext.autoReply,
                     timestamp: new Date().toISOString(),
                     chatId: currentMessageChatId,
-                    context: { topic: messageContext.topic, tone: 'auto_reply' } // Konteks untuk balasan otomatis
+                    context: { topic: messageContext.topic, tone: 'auto_reply' } // Konteks untuk auto reply
                 });
                 return;
             }
 
             for (const handler of commandHandlers) {
                 if (handler.pattern.test(text)) {
-                    const result = await handler.response(currentMessageChatId, msg); // msg diteruskan untuk konteks perintah
+                    const result = await handler.response(currentMessageChatId, msg);
                     await AlyaTyping(currentMessageChatId);
                     if (result.text) sendMessage(currentMessageChatId, result.text);
                     if (result.mood) setMood(currentMessageChatId, result.mood);
@@ -482,10 +480,8 @@ module.exports = {
             }
 
             await AlyaTyping(currentMessageChatId);
-            // Teruskan messageContext ke generateAIResponse
             const aiResponse = await generateAIResponse(text, currentMessageChatId, messageContext);
             sendMessage(currentMessageChatId, aiResponse);
-            // Respons AI sudah disimpan ke memori di dalam generateAIResponse
         });
 
         if (configuredChatId) {
@@ -527,7 +523,7 @@ module.exports = {
             schedule.scheduleJob({ rule: '0 * * * *', tz: 'Asia/Jakarta' }, updateChatSummary);
 
 
-            if (config.calendarificApiKey) { // Hanya perlu API key, TARGET_CHAT_ID sudah dicek di atas
+            if (config.calendarificApiKey) {
                 schedule.scheduleJob({ rule: '0 7 * * *', tz: 'Asia/Jakarta' }, async () => {
                     await holidaysModule.checkAndNotifyDailyHolidays(
                         config.calendarificApiKey,
