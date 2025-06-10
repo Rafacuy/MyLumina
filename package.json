@@ -12,10 +12,11 @@
     "dotenv": "^16.0.3",
     "groq-sdk": "^0.23.0",
     "moment-timezone": "^0.6.0",
+    "newsapi": "^2.4.1",
     "node-schedule": "^2.1.1",
     "node-telegram-bot-api": "^0.61.0",
     "together-ai": "^0.16.0"
   },
   "author": "Arash",
-  "license": "ISC"
+  "license": "MIT"
 }

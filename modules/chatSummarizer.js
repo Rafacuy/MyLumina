@@ -9,7 +9,6 @@ const Groq = require('groq-sdk'); // Import Groq SDK
 const config = require('../config/config'); // Memuat konfigurasi (termasuk API key Groq)
 const memory = require('../data/memory'); // Memuat modul memory untuk mengakses riwayat obrolan
 
-// Inisialisasi klien Groq dengan API key dari konfigurasi
 const client = new Groq({ apiKey: config.groqApiKey });
 
 /**
@@ -30,10 +29,9 @@ const summarizeChatHistory = async (chatHistory, maxTokens = 150) => {
     // Memfilter riwayat untuk hanya menyertakan role dan content yang relevan
     const formattedHistory = chatHistory.map(msg => ({
         role: msg.role,
-        content: msg.content || msg.text // Menggunakan 'content' atau 'text' tergantung struktur
+        content: msg.content || msg.text 
     }));
 
-    // Membuat prompt sistem untuk model AI agar melakukan peringkasan
     const systemPrompt = `Kamu adalah asisten yang bertugas meringkas percakapan.
     Ringkas percakapan berikut ini menjadi satu paragraf yang koheren dan ringkas, fokus pada poin-poin utama dan topik yang dibahas.
     Tujuan ringkasan ini adalah untuk menghemat token dan menyediakan konteks singkat untuk percakapan di masa mendatang.
@@ -42,15 +40,14 @@ const summarizeChatHistory = async (chatHistory, maxTokens = 150) => {
     try {
         console.log("[ChatSummarizer] Mengirim riwayat obrolan untuk diringkas ke Groq API...");
 
-        // Memanggil Groq API untuk meringkas chat history
         const response = await client.chat.completions.create({
-            model: "llama-3.1-8b-instant", // Menggunakan model yang sama dengan core.js atau model lain yang cocok
+            model: "llama-3.1-8b-instant", 
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: JSON.stringify(formattedHistory) }
             ],
-            max_tokens: maxTokens, // Batasi panjang ringkasan
-            temperature: 0.3 // Suhu rendah untuk ringkasan yang lebih faktual dan tidak terlalu kreatif
+            max_tokens: maxTokens, 
+            temperature: 0.3 
         });
 
         if (response?.choices?.[0]?.message?.content) {
@@ -79,7 +76,6 @@ const getSummarizedHistory = async (historyLimit = 50) => {
     const fullHistory = memory.getInMemoryHistory();
 
     // Ambil sebagian dari riwayat obrolan terbaru untuk diringkas
-    // Anda bisa menyesuaikan logika ini, misalnya, hanya meringkas jika riwayat sangat panjang
     const historyToSummarize = fullHistory.slice(-historyLimit);
 
     if (historyToSummarize.length < 3) { // Jangan meringkas jika riwayat terlalu pendek

@@ -147,10 +147,10 @@ const load = async () => {
             console.log(`Memuat ${inMemoryHistory.length} pesan ke memori aktif dari ${MEMORY_FILE}.`);
             isDirty = false; // Riwayat sekarang sinkron dengan disk
 
-            // Muat memori jangka panjang
-            longTermMemory = await readJson(LONG_TERM_MEMORY_FILE);
-            console.log(`Memuat memori jangka panjang dari ${LONG_TERM_MEMORY_FILE}.`);
-            isLongTermMemoryDirty = false;
+             // Muat memori jangka panjang
+             longTermMemory = await readJson(LONG_TERM_MEMORY_FILE);
+             console.log(`Memuat memori jangka panjang dari ${LONG_TERM_MEMORY_FILE}.`);
+             isLongTermMemoryDirty = false; 
 
             return inMemoryHistory;
         } catch (error) {
@@ -168,7 +168,8 @@ const load = async () => {
                     const backupMessages = await readNdjsonGz(backupPath);
                     inMemoryHistory = backupMessages.filter(validateHistoryEntry).slice(-MAX_HISTORY_LENGTH);
                     console.log(`Berhasil memuat ${inMemoryHistory.length} pesan dari backup.`);
-                    isDirty = true; // Tandai kotor agar status yang dipulihkan ini disimpan ke file utama
+                    isDirty = true; 
+                    isLongTermMemoryDirty = true;
                 }
             } catch (backupError) {
                 console.error('Error loading from backup:', backupError);
@@ -202,7 +203,7 @@ const flush = async () => {
     // Gunakan saveQueue untuk memastikan hanya satu operasi flush yang berjalan pada satu waktu
     saveQueue = saveQueue.then(async () => {
         try {
-            // 1. Tangani Pengarsipan: Jika riwayat mendekati batasnya, pindahkan pesan terlama ke file arsip
+            //  Tangani Pengarsipan
             if (inMemoryHistory.length >= ARCHIVE_THRESHOLD) {
                 const messagesToArchive = inMemoryHistory.slice(0, ARCHIVE_CHUNK_SIZE);
                 inMemoryHistory = inMemoryHistory.slice(ARCHIVE_CHUNK_SIZE); // Hapus pesan yang diarsipkan dari memori aktif
@@ -213,20 +214,19 @@ const flush = async () => {
                 console.log(`Mengarsipkan ${messagesToArchive.length} pesan ke ${archiveFile}`);
             }
 
-            // 2. Buat backup dari memori aktif saat ini sebelum menulis ke file utama
+            //  Buat backup dari memori aktif saat ini sebelum menulis ke file utama
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
             const backupFile = path.join(BACKUP_DIR, `memory_backup_${timestamp}.ndjson.gz`);
             await writeNdjsonGz(backupFile, inMemoryHistory);
-            // console.log(`Membuat backup: ${backupFile}`); // Uncomment untuk logging verbose
 
-            // 3. Tulis memori aktif saat ini ke file utama
+            // Tulis memori aktif saat ini ke file utama
             await writeNdjsonGz(MEMORY_FILE, inMemoryHistory);
             console.log(`Menyimpan memori aktif ke ${MEMORY_FILE}. Ukuran saat ini: ${inMemoryHistory.length}`);
 
-            // 4. Rotasi backup untuk mengelola ruang disk
+            //  Rotasi backup untuk mengelola ruang disk
             await rotateBackups();
 
-            // 5. Simpan memori jangka panjang jika ada perubahan
+            // Simpan memori jangka panjang jika ada perubahan
             if (isLongTermMemoryDirty) {
                 await writeJson(LONG_TERM_MEMORY_FILE, longTermMemory);
                 console.log(`Memori jangka panjang disimpan ke ${LONG_TERM_MEMORY_FILE}.`);
@@ -314,10 +314,9 @@ const saveLastChat = async (messageObject) => { // messageObject adalah objek le
  */
 const searchHistory = async (keyword, limit = 5) => {
     const results = [];
-    // Cari di riwayat in-memory dari yang terbaru ke terlama
     for (let i = inMemoryHistory.length - 1; i >= 0 && results.length < limit; i--) {
         if (inMemoryHistory[i].content && inMemoryHistory[i].content.toLowerCase().includes(keyword.toLowerCase())) {
-            results.unshift(inMemoryHistory[i]); // Tambahkan ke awal untuk mempertahankan urutan kronologis
+            results.unshift(inMemoryHistory[i]); 
         }
     }
 
@@ -326,7 +325,7 @@ const searchHistory = async (keyword, limit = 5) => {
 
 /**
  * Menyimpan preferensi pengguna ke memori jangka panjang.
- * @param {string} key Kunci preferensi (misalnya, 'ulangTahun', 'makananFavorit').
+ * @param {string} key Kunci preferensi.
  * @param {string} value Nilai preferensi.
  */
 const savePreference = (key, value) => {
@@ -363,7 +362,7 @@ const deletePreference = (key) => {
 // --- Module Exports ---
 module.exports = {
     load,
-    save: flush, // Expose `flush` as `save` for external calls
+    save: flush, 
     addMessage,
     searchHistory,
     getLastChatBy,
