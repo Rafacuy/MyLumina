@@ -1,7 +1,7 @@
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Node.js](https://img.shields.io/badge/node-%3E=18.0.0-green)
 
-# 🌸 AlyaBot v8.1 (Optimized) – Productive Assistant
+# 🌸 AlyaBot v8.2 (Optimized) – Productive Assistant
 
 > Telegram ChatBot smart, and act as your assistant.  
 > Built with love, by [@rafardhancuy](https://github.com/rafacuy)  
@@ -9,13 +9,14 @@
 
 ---
 
-## ✨ What's New in v8.1?
+## ✨ What's New in v8.2?
 
 - **Relation System**: The more you interact with Alya, the more points and levels you will gain.
 - **Context System**: Looking for the context of your conversation with Alya.
 - **LTM (Long-term memory)**: Use keywords like: Favorite food. Favorite movie, etc. and Alya will remember it.
 - **Holidays Information**: Notifying important days / day information
 - **TTS Everyday!**: Alya will send VN every morning, afternoon, evening and prayer time.
+- **Add: News information & summary**: Alya will send daily news every morning in 8 AM.
 - **Fixed Bugs & Errors**: Now it has been optimized for user convenience.
 
 ---
