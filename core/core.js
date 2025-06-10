@@ -39,6 +39,7 @@ const holidaysModule = require("../modules/holidays"); // Fungsi buat ngingetin/
 const sendSadSongNotification = require("../utils/songNotifier"); // Rekomendasi lagu setiap 10 PM
 const lists = require("../modules/commandLists"); // Untuk init reminder saat startup
 const relationState = require("../modules/relationState"); // Atur poin & level relasi
+const newsManager = require("../modules/newsManager"); // Mengatur BErita harian dan ringkasannya
 const chatSummarizer = require("../modules/chatSummarizer"); // Untuk meringkas riwayat obrolan
 const initTtsSchedules = require("../modules/ttsManager").initTtsSchedules;
 
@@ -604,6 +605,17 @@ module.exports = {
       schedule.scheduleJob({ rule: "0 22 * * *", tz: "Asia/Jakarta" }, () => {
         sendSadSongNotification(configuredChatId);
       });
+
+      // berita & ringkasannya setiap jam 8 pagi
+      schedule.scheduleJob(
+        { rule: "0 8 * * *", tz: "Asia/Jakarta" },
+        async () => {
+          console.log(
+            "[Core] Menjalankan pengiriman berita harian terjadwal..."
+          );
+          await newsManager.sendDailyNews(configuredChatId);
+        }
+      );
 
       // pembersihan cache dan memory (30 menit)
       setInterval(cleanupCacheAndMemory, CACHE_CLEANUP_INTERVAL_MS);

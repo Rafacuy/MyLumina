@@ -6,6 +6,7 @@ module.exports = {
     openRouterModel: process.env.OPENROUTER_MODEL || 'qwen/qwen3-4b:free',
     togetherAiApiKey: process.env.TOGETHER_API_KEY, // Together.ai API
     groqApiKey: process.env.GROQ_API_KEY, // Groq API Key
+    newsApiKey: process.env.NEWSAPI,
     USER_NAME: 'Arash', // Username
     TARGET_CHAT_ID: process.env.TARGET_CHAT_ID,
     weatherApiKey: process.env.WEATHER_API_KEY,
