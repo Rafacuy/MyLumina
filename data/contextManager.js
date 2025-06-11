@@ -1,5 +1,4 @@
 // contextManager.js
-// Gawe Alya iso lebih ngerti konteks mu
 
 const TOPIC_KEYWORDS = {
     FOOD: ['makanan', 'makan', 'kuliner', 'resto', 'lapar', 'haus', 'minum', 'resep'],

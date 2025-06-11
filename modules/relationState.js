@@ -121,7 +121,7 @@ async function addPoints(pointsToAdd) {
  * Akan dipanggil dari core.js
  */
 async function addPointOnMessage() {
-    console.log(`[DEBUG - RelationState] Fungsi addPointOnMessage dipanggil.`); // <-- TAMBAH INI
+    console.log(`[DEBUG - RelationState] Fungsi addPointOnMessage dipanggil.`); 
     await addPoints(POINTS_PER_MESSAGE);
     console.log(`[RelationState] Poin bertambah ${POINTS_PER_MESSAGE} dari interaksi pesan.`)
 }
@@ -145,13 +145,13 @@ async function checkWeeklyConversation() {
     // Cek apakah sudah lebih dari seminggu sejak pengecekan terakhir
     if (now - currentState.lastWeeklyCheckTimestamp > oneWeekInMs) {
         console.log('⏳ Melakukan pengecekan percakapan mingguan...');
-        const history = memory.getInMemoryHistory();
+        const history = await memory.getInMemoryHistory(); 
         const lastWeekDate = new Date(currentState.lastWeeklyCheckTimestamp);
 
         // Filter pesan dari user target dalam seminggu terakhir
         const userMessagesLastWeek = history.filter(msg =>
             msg.role === 'user' &&
-            msg.from &&
+            msg.from && // Pastikan properti 'from' ada
             msg.from.first_name === config.USER_NAME &&
             new Date(msg.timestamp) > lastWeekDate
         );
@@ -199,7 +199,7 @@ function getCurrentPoints() {
     return currentState.points;
 }
 
-// Inisialisasi: Muat status relasi saat modul pertama kali dijalankan.
+// Inisialisasi
 loadRelationState();
 
 module.exports = {

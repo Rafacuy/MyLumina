@@ -1,7 +1,5 @@
 .env
-node_modules/
-backups/
-archives/
+memory.db
 memory.ndjson.gz
 reminders.json
 notes.json

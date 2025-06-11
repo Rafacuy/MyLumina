@@ -1,5 +1,5 @@
 // core/core.js
-// Alya v7.0
+// Alya v8.5
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
@@ -29,17 +29,17 @@ const {
   getCurrentMood,
   AlyaTyping,
   getPersonalityMode,
-} = require("../modules/commandHandlers"); // Fungsi dan konstanta mood, tambahkan getPersonalityMode
+} = require("../modules/commandHandlers"); 
 const {
   getWeatherData,
   getWeatherString,
   getWeatherReminder,
-} = require("../modules/weather"); // Fungsi dan konstanta cuaca
+} = require("../modules/weather"); // Fungsi dan cuaca
 const holidaysModule = require("../modules/holidays"); // Fungsi buat ngingetin/meriksa apakah sekarang hari penting atau tidak
 const sendSadSongNotification = require("../utils/songNotifier"); // Rekomendasi lagu setiap 10 PM
 const lists = require("../modules/commandLists"); // Untuk init reminder saat startup
 const relationState = require("../modules/relationState"); // Atur poin & level relasi
-const newsManager = require("../modules/newsManager"); // Mengatur BErita harian dan ringkasannya
+const newsManager = require("../modules/newsManager"); // Mengatur Berita harian dan ringkasannya
 const chatSummarizer = require("../modules/chatSummarizer"); // Untuk meringkas riwayat obrolan
 const initTtsSchedules = require("../modules/ttsManager").initTtsSchedules;
 
@@ -51,8 +51,7 @@ const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
 const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
 const SLEEP_END_HOUR = 4; // Waktu berakhir tidur Alya (04:00 - 4 pagi)
-const CONVERSATION_HISTORY_LIMIT = 4; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI (dinaikkan sedikit untuk konteks yang lebih baik)
-const TOTAL_CONVERSATION_HISTORY_LIMIT = 100; // Batasi jumlah total pesan yang disimpan dalam memori (sesuai memory.js MAX_HISTORY_LENGTH)
+const CONVERSATION_HISTORY_LIMIT = 8; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI (dinaikkan sedikit untuk konteks yang lebih baik)
 const CACHE_CLEANUP_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
 const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
@@ -65,21 +64,20 @@ let messageCache = new Map(); // Mengcache respons AI untuk menghindari panggila
 let userRequestCounts = new Map(); // Melacak jumlah permintaan untuk pembatasan laju per pengguna
 let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Alya dalam mode deeptalk
 let currentChatSummary = null; // Untuk menyimpan ringkasan obrolan terbaru
+let loadedLongTermMemory = {}; // Cache untuk memori jangka panjang
 
 // Memuat riwayat percakapan dan memori jangka panjang dari memori saat startup
-memory
-  .load()
-  .then((loadedHistory) => {
-    console.log(
-      `Memuat ${loadedHistory.length} pesan dari memori (via memory.js).`
-    );
-  })
-  .catch((error) => {
-    console.error(
-      "Kesalahan saat memuat riwayat percakapan dari memori:",
-      error
-    );
-  });
+async function initializeMemory() {
+  try {
+    const loadedHistory = await memory.load();
+    console.log(`Memuat ${loadedHistory.length} pesan dari memori (via memory.js).`);
+    loadedLongTermMemory = await memory.getLongTermMemory();
+    console.log(`Memuat ${Object.keys(loadedLongTermMemory).length} preferensi dari memori jangka panjang.`);
+  } catch (error) {
+    console.error("Kesalahan saat memuat riwayat percakapan atau memori jangka panjang dari memori:", error);
+  }
+}
+initializeMemory(); // Panggil saat startup
 
 /**
  * Memperbarui ringkasan obrolan secara berkala.
@@ -87,8 +85,10 @@ memory
  */
 const updateChatSummary = async () => {
   console.log("[Core] Memperbarui ringkasan obrolan...");
+  // Ambil riwayat dari memory.js
+  const fullHistory = await memory.getInMemoryHistory(); 
   // Meringkas 50 pesan terakhir
-  const summary = await chatSummarizer.getSummarizedHistory(50);
+  const summary = await chatSummarizer.getSummarizedHistory(50, fullHistory); // Teruskan fullHistory
   if (summary) {
     currentChatSummary = summary;
     console.log("[Core] Ringkasan obrolan terbaru berhasil dibuat.");
@@ -109,10 +109,10 @@ const updateChatSummary = async () => {
  * @param {object} params.currentMood - Objek mood saat ini.
  * @param {string|null} params.currentTopic - Topik percakapan saat ini.
  * @param {string|null} params.summaryContext - Ringkasan obrolan sebelumnya.
- * @param {object} params.longTermMemory - Objek memori jangka panjang.
+ * @param {object} params.longTermMemory - Objek memori jangka panjang (sudah dimuat).
  * @returns {string} String prompt sistem.
  */
-function generateAlyaPrompt({
+async function generateAlyaPrompt({ 
   USER_NAME,
   isDeeptalkMode,
   currentMood,
@@ -120,9 +120,7 @@ function generateAlyaPrompt({
   summaryContext,
   longTermMemory,
 }) {
-  const recentHistory = memory
-    .getInMemoryHistory()
-    .slice(-CONVERSATION_HISTORY_LIMIT);
+  const recentHistory = (await memory.getInMemoryHistory()).slice(-CONVERSATION_HISTORY_LIMIT);
   const mood = currentMood?.name?.toLowerCase() || "netral";
   const topicContext = currentTopic
     ? `Kita sedang membahas tentang ${currentTopic
@@ -223,14 +221,15 @@ function generateAlyaPrompt({
  */
 const generateAIResponse = async (prompt, requestChatId, messageContext) => {
   if (!messageContext || typeof messageContext !== "object") {
-    messageContext = { topic: null }; // fallback
+    messageContext = { topic: null };     
   }
 
   const now = new Date();
   const currentHour = getJakartaHour();
   const currentMood = getCurrentMood();
   const currentPersonality = getPersonalityMode();
-  const longTermMemory = memory.getLongTermMemory(); // memori jangka panjang
+  // Gunakan loadedLongTermMemory yang sudah dicache
+  const longTermMemory = loadedLongTermMemory; 
 
   // Mode tidur Alya
   if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
@@ -240,7 +239,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
   // Cek cache
   const cacheKey = `${prompt}_${
     messageContext.topic || "no_topic"
-  }_${currentPersonality}_${currentMood.name}_${isDeeptalkMode}`; // Perbarui cache key
+  }_${currentPersonality}_${currentMood.name}_${isDeeptalkMode}`; 
   if (messageCache.has(cacheKey)) {
     console.log(`Cache hit untuk: "${cacheKey}"`);
     return messageCache.get(cacheKey);
@@ -272,7 +271,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
     });
   }
 
-  const systemPrompt = generateAlyaPrompt({
+  const systemPrompt = await generateAlyaPrompt({ 
     USER_NAME,
     currentPersonality,
     isDeeptalkMode,
@@ -300,6 +299,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
     if (response?.choices?.[0]?.message?.content) {
       const aiResponse = response.choices[0].message.content.trim();
 
+      // Tambahkan respons AI ke memori
       await memory.addMessage({
         role: "assistant",
         content: aiResponse,
@@ -349,7 +349,7 @@ function isOnlyNumbers(str) {
 }
 
 /**
- * Membersihkan cache pesan dan memicu penyimpanan memori.
+ * Membersihkan cache pesan.
  */
 const cleanupCacheAndMemory = async () => {
   console.log("Menjalankan pembersihan cache...");
@@ -405,7 +405,7 @@ const updateTimeBasedModes = (chatId) => {
  * Ini versi modular dan fleksibel.
  * @param {string} text - Pesan dari user.
  */
-const analyzeAndSavePreferences = (text) => {
+const analyzeAndSavePreferences = async (text) => { 
   if (typeof text !== "string") return;
 
   const lowerText = text.toLowerCase();
@@ -448,24 +448,23 @@ const analyzeAndSavePreferences = (text) => {
     },
   ];
 
+  let preferenceChanged = false; // Flag untuk menandai apakah ada preferensi yang disimpan/diperbarui
   for (const { key, regex } of preferencePatterns) {
     const match = normalizedText.match(regex);
     if (match && match[2]) {
       const value = match[2].trim();
-      const oldValue = memory.getPreference(key);
+      const oldValue = await memory.getPreference(key); 
       if (oldValue !== value) {
-        // Hanya simpan jika nilai berubah
-        memory.savePreference(key, value);
-        console.log(
-          `[LTM Save Success] Preferensi baru/diperbarui: <span class="math-inline">\{key\} \= "</span>{value}"`
-        );
+        await memory.savePreference(key, value);
+        loadedLongTermMemory[key] = value; // Perbarui cache LTM
+        console.log(`[LTM Save Success] Preferensi baru/diperbarui: ${key} = "${value}"`);
+        preferenceChanged = true;
       } else {
-        console.log(
-          `[LTM Skip] Preferensi <span class="math-inline">\{key\} sudah sama dengan nilai yang ada\: "</span>{value}"`
-        );
+        console.log(`[LTM Skip] Preferensi ${key} sudah sama dengan nilai yang ada: "${value}"`);
       }
     }
   }
+  return preferenceChanged; // Mengembalikan flag
 };
 
 module.exports = {
@@ -501,15 +500,10 @@ module.exports = {
       if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text)))
         return;
 
-      // Panggil analyzeAndSavePreferences dan periksa apakah ada preferensi yang disimpan
-      const initialLongTermMemoryKeys = Object.keys(memory.getLongTermMemory());
-      analyzeAndSavePreferences(text);
-      const updatedLongTermMemoryKeys = Object.keys(memory.getLongTermMemory());
+        await relationState.addPointOnMessage(); 
 
-      // Cek apakah ada perubahan pada LTM (preferensi baru disimpan)
-      const newPreferencesSaved = updatedLongTermMemoryKeys.some(
-        (key) => !initialLongTermMemoryKeys.includes(key)
-      );
+      // Panggil analyzeAndSavePreferences dan periksa apakah ada preferensi yang disimpan
+      const newPreferencesSaved = await analyzeAndSavePreferences(text); 
 
       if (newPreferencesSaved) {
         await AlyaTyping(currentMessageChatId);
@@ -542,26 +536,28 @@ module.exports = {
           role: 'user',
           content: text,
           from: senderInfo,
-          chat: { id: chat.id, type: chat.type },
+          chatId: chat.id, // Gunakan chatId (camelCase)
           message_id: msg.message_id,
           date: msg.date,
           timestamp: new Date(msg.date * 1000).toISOString(),
           context: messageContext // Simpan konteks yang dianalisis
       };
 
-      await memory.saveLastChat(userMessageToStore);
+      // Simpan pesan pengguna ke memori
+      await memory.addMessage(userMessageToStore);
 
       console.log(`Pesan pengguna disimpan ke memori dengan konteks.`);
 
       if (messageContext.autoReply) {
         await AlyaTyping(currentMessageChatId);
         sendMessage(currentMessageChatId, messageContext.autoReply);
+        // Tambahkan auto-reply ke memori
         await memory.addMessage({
           role: "assistant",
           content: messageContext.autoReply,
           timestamp: new Date().toISOString(),
           chatId: currentMessageChatId,
-          context: { topic: messageContext.topic, tone: "auto_reply" }, // Konteks untuk auto reply
+          context: { topic: messageContext.topic, tone: "auto_reply" }, 
         });
         return;
       }
@@ -570,7 +566,17 @@ module.exports = {
         if (handler.pattern.test(text)) {
           const result = await handler.response(currentMessageChatId, msg);
           await AlyaTyping(currentMessageChatId);
-          if (result.text) sendMessage(currentMessageChatId, result.text);
+          if (result.text) {
+            sendMessage(currentMessageChatId, result.text);
+            // Tambahkan respons command ke memori
+            await memory.addMessage({
+              role: "assistant",
+              content: result.text,
+              timestamp: new Date().toISOString(),
+              chatId: currentMessageChatId,
+              context: { topic: "command_response", command: handler.name },
+            });
+          }
           if (result.mood) setMood(currentMessageChatId, result.mood);
           return;
         }
@@ -665,5 +671,17 @@ module.exports = {
       }
       updateTimeBasedModes(configuredChatId);
     }
+
+    // Tangani penutupan aplikasi untuk menutup database SQLite
+    process.on('SIGINT', async () => {
+      console.log('SIGINT received. Closing database connection...');
+      await memory.closeDb();
+      process.exit(0);
+    });
+    process.on('SIGTERM', async () => {
+      console.log('SIGTERM received. Closing database connection...');
+      await memory.closeDb();
+      process.exit(0);
+    });
   },
 };
