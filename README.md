@@ -68,6 +68,7 @@ GROQ_API_KEY=YOUR_GROQ_API_KEY # Change to your Groq API Key
 WEATHER_API_KEY=YOUR_OPENWEATHERMAP_KEY # Replace it to your actual OpenWeather API Key
 LATITUDE=-6.200000 # Change it to your location LATITUDE (e.g, Jakarta)
 LONGITUDE=106.816666 # Change it to your location LONGITUDE (e.g, jakarta)
+NEWSAPI=YOUR_NEWSAPI_KEY # Change it to your actual newsapi key
 TARGET_CHAT_ID=YOUR_CHAT_ID # Your Chat ID
 CALENDARIFIC_API_KEY=YOUR_API_KEY # Change it to your actual Calendarific API KEY
 GOOGLE_SEARCH_API_KEY=YOUR_GOOGLE_KEY # Your google search API KEY
@@ -82,6 +83,7 @@ GOOGLE_SEARCH_CX=YOUR_CSE_ID # Your google search CSEID
 - `GOOGLE_SEARCH_API_KEY`: Your API Key from [GoogleCustomSearch](https://developers.google.com/custom-search/v1/overview)
 - `GOOGLE_SEARCH_CX`: Your API Key from [GoogleCustomSearchEngine](https://developers.google.com/custom-search/v1/overview)
 - `CALENDARIFIC_API_KEY`: Your API Key from [Calendarific](https://calendarific.com/).
+- `NEWSAPI`: Your API key from [NewsAPI](https://newsapi.org)
 
 ### 4. Customize Alya **(Optional)**:
 - You can change `USER_NAME` to the name of the user Alya will interact with (default: 'Arash') in [config.js](./config/config.js). 
