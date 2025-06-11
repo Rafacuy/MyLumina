@@ -538,6 +538,17 @@ module.exports = {
 
       const messageContext = contextManager.analyzeMessage(msg);
 
+      const userMessageToStore = {
+          role: 'user',
+          content: text,
+          from: senderInfo,
+          chat: { id: chat.id, type: chat.type },
+          message_id: msg.message_id,
+          date: msg.date,
+          timestamp: new Date(msg.date * 1000).toISOString(),
+          context: messageContext // Simpan konteks yang dianalisis
+      };
+
       await memory.saveLastChat(userMessageToStore);
 
       console.log(`Pesan pengguna disimpan ke memori dengan konteks.`);
