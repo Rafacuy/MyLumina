@@ -9,6 +9,7 @@ const Mood = {
     LOVING: { emoji: '>///<', name: 'Loving' },
     NORMAL: { emoji: '>~<', name: 'Normal' },
     CALM: { emoji: '😌', name: 'Tenang' },
+    JEALOUS: { emoji: '😒', name: 'Ngambek' }
 };
 
 module.exports = Mood;

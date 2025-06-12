@@ -5,3 +5,4 @@ reminders.json
 notes.json
 relationState.json
 longTermMemory.json
+node_modules

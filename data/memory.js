@@ -213,15 +213,17 @@ const flush = async () => {
  */
 const savePreference = async (key, value) => {
   try {
+    const storedValue = typeof value === "string" ? value : JSON.stringify(value);
     await run(
       'INSERT OR REPLACE INTO preferences (key, value) VALUES (?, ?)',
-      [key, value]
+      [key, storedValue]
     );
-    console.log(`Preference saved: ${key} = ${value}`); 
+    console.log(`Preference saved: ${key} =`, value); 
   } catch (error) {
     console.error('Error saving preference:', error);
   }
 };
+
 
 /**
  * Mendapatkan nilai preferensi berdasarkan kunci.
@@ -231,12 +233,29 @@ const savePreference = async (key, value) => {
 const getPreference = async (key) => {
   try {
     const result = await query('SELECT value FROM preferences WHERE key = ?', [key]);
-    return result[0]?.value;
+    const rawValue = result[0]?.value;
+
+    if (rawValue === undefined || rawValue === null || rawValue === 'undefined') {
+      return undefined;
+    }
+
+    try {
+      const parsed = JSON.parse(rawValue);
+      if (typeof parsed === 'object' || Array.isArray(parsed)) {
+        return parsed;
+      }
+    } catch (e) {
+      // If it's not JSON, return as-is (primitive string)
+    }
+
+    return rawValue;
   } catch (error) {
     console.error('Error getting preference:', error);
     return undefined;
   }
 };
+
+
 
 /**
  * Menghapus preferensi berdasarkan kunci.
