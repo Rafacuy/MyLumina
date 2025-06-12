@@ -4,7 +4,7 @@ const fs = require('fs').promises; // Untuk operasi sistem file (membaca/menulis
 const schedule = require('node-schedule'); // Untuk menjadwalkan pengingat
 const axios = require('axios'); // Untuk membuat permintaan HTTP ke API
 const config = require('../config/config'); // File konfigurasi untuk kunci API dan pengaturan lainnya
-const sendMessage = require('../utils/sendMessage'); // Utilitas untuk mengirim pesan (pastikan ada dan tangguh)
+const { sendMessage } = require('../utils/sendMessage'); // Utilitas untuk mengirim pesan (pastikan ada dan tangguh)
 const { formatJakartaDateTime, formatJakartaTime, getJakartaMoment } = require('../utils/timeHelper'); // Utilitas untuk waktu Jakarta (pastikan ada dan tangguh)
 const { generateAIResponse } = require('../core/coreRouter');
 
@@ -19,15 +19,11 @@ const ensureDirExists = async (filePath) => {
     try {
         const dir = filePath.substring(0, filePath.lastIndexOf('/'));
         if (dir && dir !== '.') {
-            // Membuat direktori secara rekursif jika belum ada
             await fs.mkdir(dir, { recursive: true });
         }
     } catch (err) {
-        // Jika error adalah EEXIST, tidak apa-apa (direktori sudah ada)
         if (err.code !== 'EEXIST') {
             console.error(`Error membuat direktori untuk ${filePath}:`, err.message);
-            // Tergantung tingkat keparahan, Anda mungkin ingin melempar error ini atau menanganinya
-            // Untuk saat ini, hanya dicatat. Operasi kritis mungkin perlu dihentikan.
         }
     }
 };
@@ -91,7 +87,7 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
         const now = getJakartaMoment();
         let reminderTime;
 
-        // Parsing waktu dasar
+        // Parsing waktu
         const timeParts = timeString.split(':');
         if (timeParts.length === 2 && !isNaN(timeParts[0]) && !isNaN(timeParts[1])) {
             const hour = parseInt(timeParts[0], 10);
@@ -102,7 +98,7 @@ const setReminder = async (botInstance, chatId, timeString, message, userName) =
             }
         } else if (timeString.toLowerCase().includes('tomorrow') || timeString.toLowerCase().includes('besok')) {
             const parts = timeString.toLowerCase().split(' ');
-            const time = parts.find(p => p.includes(':')); // cari waktu seperti "10:00"
+            const time = parts.find(p => p.includes(':'));
             if (time) {
                 const timePartsTomorrow = time.split(':');
                 if (timePartsTomorrow.length === 2 && !isNaN(timePartsTomorrow[0]) && !isNaN(timePartsTomorrow[1])) {

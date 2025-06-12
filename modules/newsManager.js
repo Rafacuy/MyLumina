@@ -18,11 +18,13 @@ const groq = new Groq({ apiKey: config.groqApiKey });
 async function getTopNewsIndonesia() {
     try {
         console.log("[NewsManager] Mengambil berita utama dari NewsAPI...");
-        const response = await newsapi.v2.topHeadlines({
-            country: 'id', // Negara: Indonesia
-            language: 'id', // Bahasa: Indonesia
-            pageSize: 5 // Mengambil 5 berita teratas
+        const response = await newsapi.v2.everything({
+            q: 'indonesia',
+            language: 'id',
+            sortBy: 'publishedAt',
+            pageSize: 5
         });
+        
 
         if (response.status === 'ok' && response.articles.length > 0) {
             console.log(`[NewsManager] Berhasil mengambil ${response.articles.length} berita.`);
