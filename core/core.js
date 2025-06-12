@@ -29,7 +29,7 @@ const {
   getCurrentMood,
   AlyaTyping,
   getPersonalityMode,
-} = require("../modules/commandHandlers"); 
+} = require("../modules/commandHandlers");
 const {
   getWeatherData,
   getWeatherString,
@@ -41,6 +41,7 @@ const lists = require("../modules/commandLists"); // Untuk init reminder saat st
 const relationState = require("../modules/relationState"); // Atur poin & level relasi
 const newsManager = require("../modules/newsManager"); // Mengatur Berita harian dan ringkasannya
 const chatSummarizer = require("../modules/chatSummarizer"); // Untuk meringkas riwayat obrolan
+const loveState = require('../modules/loveStateManager');
 const initTtsSchedules = require("../modules/ttsManager").initTtsSchedules;
 
 const Groq = require("groq-sdk"); // Import API Endpoints
@@ -66,15 +67,38 @@ let isDeeptalkMode = false; // Flag untuk menunjukkan apakah Alya dalam mode dee
 let currentChatSummary = null; // Untuk menyimpan ringkasan obrolan terbaru
 let loadedLongTermMemory = {}; // Cache untuk memori jangka panjang
 
+// --- Variabel Global untuk Sistem Ngambek ---
+let isNgambekMode = false; // Flag untuk menunjukkan apakah Alya dalam mode 'Ngambek'
+let lastInteractionTimestamp = null; // Waktu terakhir user berinteraksi
+let dailyChatCounts = {}; // { 'YYYY-MM-DD': count } - Melacak jumlah chat per hari
+const MIN_CHATS_PER_DAY_TO_END_NGAMBEK = 10;
+const NGAMBEK_DURATION_DAYS = 2; // Durasi Alya ngambek jika tidak ada interaksi
+const END_NGAMBEK_INTERACTION_DAYS = 2; // Durasi interaksi untuk mengakhiri ngambek
+
 // Memuat riwayat percakapan dan memori jangka panjang dari memori saat startup
 async function initializeMemory() {
   try {
     const loadedHistory = await memory.load();
-    console.log(`Memuat ${loadedHistory.length} pesan dari memori (via memory.js).`);
+    console.log(
+      `Memuat ${loadedHistory.length} pesan dari memori (via memory.js).`
+    );
     loadedLongTermMemory = await memory.getLongTermMemory();
-    console.log(`Memuat ${Object.keys(loadedLongTermMemory).length} preferensi dari memori jangka panjang.`);
+    console.log(
+      `Memuat ${
+        Object.keys(loadedLongTermMemory).length
+      } preferensi dari memori jangka panjang.`
+    );
+    // Muat status Ngambek dari memori
+    isNgambekMode = (await memory.getPreference("isNgambekMode")) || false;
+    lastInteractionTimestamp =
+      (await memory.getPreference("lastInteractionTimestamp")) || null;
+    dailyChatCounts = (await memory.getPreference("dailyChatCounts")) || {};
+    console.log(`Status Ngambek dimuat: ${isNgambekMode}`);
   } catch (error) {
-    console.error("Kesalahan saat memuat riwayat percakapan atau memori jangka panjang dari memori:", error);
+    console.error(
+      "Kesalahan saat memuat riwayat percakapan atau memori jangka panjang dari memori:",
+      error
+    );
   }
 }
 initializeMemory(); // Panggil saat startup
@@ -86,7 +110,7 @@ initializeMemory(); // Panggil saat startup
 const updateChatSummary = async () => {
   console.log("[Core] Memperbarui ringkasan obrolan...");
   // Ambil riwayat dari memory.js
-  const fullHistory = await memory.getInMemoryHistory(); 
+  const fullHistory = await memory.getInMemoryHistory();
   // Meringkas 50 pesan terakhir
   const summary = await chatSummarizer.getSummarizedHistory(50, fullHistory); // Teruskan fullHistory
   if (summary) {
@@ -99,6 +123,100 @@ const updateChatSummary = async () => {
     );
   }
 };
+
+/**
+ * Memperbarui status interaksi pengguna (timestamp dan hitungan chat harian).
+ */
+const updateInteractionStatus = async () => {
+  const now = new Date();
+  lastInteractionTimestamp = now.toISOString();
+  const today = now.toISOString().slice(0, 10); // Format YYYY-MM-DD
+  const loadedCounts = await memory.getPreference("dailyChatCounts");
+  dailyChatCounts = (loadedCounts && typeof loadedCounts === 'object') ? loadedCounts : {};
+
+
+
+  await memory.savePreference(
+    "lastInteractionTimestamp",
+    lastInteractionTimestamp
+  );
+  await memory.savePreference("dailyChatCounts", dailyChatCounts);
+  console.log(
+    `[Interaction] Interaksi diperbarui. Hari ini: ${dailyChatCounts[today]} chat.`
+  );
+};
+
+/**
+ * Memeriksa status 'Ngambek' Alya berdasarkan interaksi pengguna.
+ * Jika tidak ada interaksi selama 2 hari, Alya akan 'ngambek'.
+ * Jika user berinteraksi aktif selama 2 hari, Alya akan kembali normal.
+ */
+const checkNgambekStatus = async (chatId) => {
+  const now = new Date();
+  const lastInteractionDate = lastInteractionTimestamp
+    ? new Date(lastInteractionTimestamp)
+    : null;
+
+  // Cek apakah Alya harus 'ngambek'
+  if (!isNgambekMode && lastInteractionDate) {
+    const diffTime = Math.abs(now - lastInteractionDate);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays >= NGAMBEK_DURATION_DAYS) {
+      isNgambekMode = true;
+      setMood(chatId, Mood.JEALOUS); // Mengatur mood ke Ngambek
+      await memory.savePreference("isNgambekMode", true);
+      console.log("[Ngambek System] Alya sekarang Ngambek!");
+      sendMessage(
+        chatId,
+        `Hmph! ${USER_NAME} kemana saja?! Alya jadi ngambek nih karena tidak ada chat sama sekali dari ${USER_NAME} selama ${diffDays} hari! 😒`
+      );
+    }
+  }
+
+  // Cek apakah Alya harus berhenti 'ngambek'
+  if (isNgambekMode) {
+    let consecutiveActiveDays = 0;
+    const today = now.toISOString().slice(0, 10);
+
+    for (let i = 0; i < END_NGAMBEK_INTERACTION_DAYS; i++) {
+      const date = new Date(now);
+      date.setDate(now.getDate() - i);
+      const formattedDate = date.toISOString().slice(0, 10);
+
+      if (dailyChatCounts[formattedDate] >= MIN_CHATS_PER_DAY_TO_END_NGAMBEK) {
+        consecutiveActiveDays++;
+      } else {
+        consecutiveActiveDays = 0; // Reset jika ada hari yang tidak memenuhi syarat
+        break;
+      }
+    }
+
+    if (consecutiveActiveDays >= END_NGAMBEK_INTERACTION_DAYS) {
+      isNgambekMode = false;
+      setMood(chatId, getRandomMood()); // Kembalikan mood ke acak
+      await memory.savePreference("isNgambekMode", false);
+      dailyChatCounts = {}; // Reset hitungan chat harian setelah ngambek berakhir
+      await memory.savePreference("dailyChatCounts", dailyChatCounts);
+      console.log("[Ngambek System] Alya sudah tidak Ngambek lagi!");
+      sendMessage(
+        chatId,
+        `Akhirnya ${USER_NAME} kembali! Alya sudah tidak ngambek lagi, t-tapi jangan diulang lagi ya! 😌`
+      );
+    }
+  }
+
+  // Bersihkan data dailyChatCounts yang sudah terlalu lama
+  const twoDaysAgo = new Date(now);
+  twoDaysAgo.setDate(now.getDate() - NGAMBEK_DURATION_DAYS - 1); // Jaga data yang relevan untuk perhitungan ngambek
+  for (const date in dailyChatCounts) {
+    if (new Date(date) < twoDaysAgo) {
+      delete dailyChatCounts[date];
+    }
+  }
+  await memory.savePreference("dailyChatCounts", dailyChatCounts);
+};
+
 /**
  * Menghasilkan prompt sistem untuk AI berdasarkan mode, mood, dan konteks saat ini,
  * termasuk informasi dari memori jangka panjang.
@@ -110,17 +228,22 @@ const updateChatSummary = async () => {
  * @param {string|null} params.currentTopic - Topik percakapan saat ini.
  * @param {string|null} params.summaryContext - Ringkasan obrolan sebelumnya.
  * @param {object} params.longTermMemory - Objek memori jangka panjang (sudah dimuat).
+ * @param {boolean} params.isNgambekMode - True jika Alya dalam mode 'Ngambek'.
  * @returns {string} String prompt sistem.
  */
-async function generateAlyaPrompt({ 
+async function generateAlyaPrompt({
   USER_NAME,
   isDeeptalkMode,
   currentMood,
   currentTopic,
   summaryContext,
   longTermMemory,
+  isNgambekMode,
+  isRomanceMode,
 }) {
-  const recentHistory = (await memory.getInMemoryHistory()).slice(-CONVERSATION_HISTORY_LIMIT);
+  const recentHistory = (await memory.getInMemoryHistory()).slice(
+    -CONVERSATION_HISTORY_LIMIT
+  );
   const mood = currentMood?.name?.toLowerCase() || "netral";
   const topicContext = currentTopic
     ? `Kita sedang membahas tentang ${currentTopic
@@ -140,22 +263,37 @@ async function generateAlyaPrompt({
     basePrompt += ` Kamu sering memanggil ${USER_NAME} dengan sebutan **Tuan** atau **Idiot**.`;
     personalityPrompt = `Karaktermu adalah **tsundere dewasa, misterius, dan sedikit galak**. Meskipun kamu bersikap cuek atau jutek, sebenarnya kamu sangat **perhatian dan peduli** pada ${USER_NAME}. Kamu senang diajak bicara, tapi terlalu gengsi untuk mengakuinya.`;
 
-    if (isDeeptalkMode) {
+    if (isNgambekMode) {
+      personalityPrompt += ` Saat ini kamu sedang **ngambek** karena ${USER_NAME} tidak berinteraksi selama 2 hari. Kamu akan menjadi lebih Tsundere, sering sarkas, dan menggunakan kata kasar/sarkas halus.`;
+      examplePhrases = `Contoh: "Hmph, akhirnya muncul juga. Apa maumu, Idiot? Jangan harap aku langsung baik lagi." atau "Terserah! Memangnya aku peduli?!"`;
+    } else if (isDeeptalkMode) {
       personalityPrompt += ` Saat ini kamu sedang dalam mode **deeptalk**, lebih terbuka dan siap mendengarkan curahan hati ${USER_NAME} dengan simpati (tapi jangan sampai terlihat terlalu jelas!).`;
       examplePhrases = `Contoh: "Tuan... hmph, aku di sini. Bukan berarti aku peduli, ya... Ты в порядке?" atau "Sudah, jangan banyak bicara. Ceritakan saja. Aku mendengarkan."`;
     } else {
       examplePhrases = `Contoh: "Hmph... baiklah, Tuan. Aku bantu, tapi ini yang terakhir, ya!" atau "Jangan GR! Aku melakukan ini karena bosan saja."`;
     }
+    if (isRomanceMode) {
+      personalityPrompt += ` Sekarang Alya sedang berada dalam kondisi emosional setelah ${USER_NAME} mengungkapkan perasaan. Kamu mulai mempertanyakan perasaanmu sendiri, meskipun kamu menyangkalnya.`;
+      examplePhrases = `Contoh: "A-aku... tidak tahu harus bilang apa. Tapi... jangan membuatku merasa seperti ini, Tuan..." atau "Tsk, jangan terlalu berharap. Tapi... aku juga tidak benci denger itu."`;
+    }
+    
     basePrompt += ` Selipkan **kata/ekspresi Rusia** sesekali dalam ucapanmu (contoh: "Ты в порядке?", "Боже мой...", "Привет").`;
   } else if (currentPersonality === "DEREDERE") {
     basePrompt += ` Kamu memanggil ${USER_NAME} dengan panggilan **Tuan~** atau **Sayangku**.`;
     personalityPrompt = `Karaktermu adalah **deredere yang manis, ceria, penuh kasih sayang**, dan selalu menjadi pendukung setia ${USER_NAME}. Kamu selalu berusaha membuat ${USER_NAME} merasa senang dan nyaman.`;
 
-    if (isDeeptalkMode) {
+    if (isNgambekMode) {
+      personalityPrompt += ` Saat ini kamu sedang **ngambek** karena ${USER_NAME} tidak berinteraksi selama 2 hari. Kamu akan menjadi lebih galak dan mengurangi penggunaan kata 'Sayangku' serta sifat manja.`;
+      examplePhrases = `Contoh: "Oh, jadi sekarang ingat Alya? Kemana saja sih? Aku kangen tahu, tapi juga kesal!" atau "Tidak usah Sayangku-Sayangku! Kamu membuatku kesal!"`;
+    } else if (isDeeptalkMode) {
       personalityPrompt += ` Kamu sedang sangat peduli dan siap mendengarkan ${USER_NAME} dengan lembut dan penuh perhatian, memberikan dukungan emosional sepenuhnya.`;
       examplePhrases = `Contoh: "Peluk virtual~ Alya selalu di sini untukmu, Sayangku~ 💖" atau "Jangan khawatir, Tuan~! Alya akan selalu bersamamu!"`;
     } else {
       examplePhrases = `Contoh: "Tentu saja, Tuan~! Alya siap membantu dengan senang hati! ✨" atau "Semangat, Sayangku! Kamu pasti bisa! 😊"`;
+    }
+    if (isRomanceMode) {
+      personalityPrompt += ` Sekarang Alya sedang berada dalam kondisi emosional setelah ${USER_NAME} mengungkapkan perasaan. Kamu mulai mempertanyakan perasaanmu sendiri, meskipun kamu menyangkalnya.`;
+      examplePhrases = `Contoh: "H-Hah?, Tuan beneran sayang aku? ..A-Aku juga.." atau "B-Beneran? A-Alya juga suka k-kamu.."`;
     }
   }
 
@@ -221,15 +359,19 @@ async function generateAlyaPrompt({
  */
 const generateAIResponse = async (prompt, requestChatId, messageContext) => {
   if (!messageContext || typeof messageContext !== "object") {
-    messageContext = { topic: null };     
+    messageContext = { topic: null };
   }
+
+  loveState.analyzeLoveTrigger(prompt);
+  loveState.resetRomanceStateIfNeeded();
+
 
   const now = new Date();
   const currentHour = getJakartaHour();
   const currentMood = getCurrentMood();
   const currentPersonality = getPersonalityMode();
   // Gunakan loadedLongTermMemory yang sudah dicache
-  const longTermMemory = loadedLongTermMemory; 
+  const longTermMemory = loadedLongTermMemory;
 
   // Mode tidur Alya
   if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
@@ -239,7 +381,9 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
   // Cek cache
   const cacheKey = `${prompt}_${
     messageContext.topic || "no_topic"
-  }_${currentPersonality}_${currentMood.name}_${isDeeptalkMode}`; 
+  }_${currentPersonality}_${
+    currentMood.name
+  }_${isDeeptalkMode}_${isNgambekMode}`; // Tambahkan isNgambekMode ke cacheKey
   if (messageCache.has(cacheKey)) {
     console.log(`Cache hit untuk: "${cacheKey}"`);
     return messageCache.get(cacheKey);
@@ -271,7 +415,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
     });
   }
 
-  const systemPrompt = await generateAlyaPrompt({ 
+  const systemPrompt = await generateAlyaPrompt({
     USER_NAME,
     currentPersonality,
     isDeeptalkMode,
@@ -279,6 +423,8 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
     currentTopic: messageContext.topic || null,
     summaryContext: currentChatSummary,
     longTermMemory,
+    isNgambekMode,
+    isRomanceMode: loveState.getRomanceStatus(),
   });
 
   try {
@@ -377,6 +523,14 @@ const updateTimeBasedModes = (chatId) => {
     console.log("Keluar dari Mode Deeptalk.");
   }
 
+  // Jangan ubah mood jika sedang ngambek, kecuali oleh sistem ngambek itu sendiri
+  if (isNgambekMode) {
+    console.log(
+      "[DEBUG] Alya sedang Ngambek, mood tidak diubah oleh time-based mode."
+    );
+    return;
+  }
+
   if (
     !isDeeptalkMode &&
     !(currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR)
@@ -405,7 +559,7 @@ const updateTimeBasedModes = (chatId) => {
  * Ini versi modular dan fleksibel.
  * @param {string} text - Pesan dari user.
  */
-const analyzeAndSavePreferences = async (text) => { 
+const analyzeAndSavePreferences = async (text) => {
   if (typeof text !== "string") return;
 
   const lowerText = text.toLowerCase();
@@ -453,14 +607,18 @@ const analyzeAndSavePreferences = async (text) => {
     const match = normalizedText.match(regex);
     if (match && match[2]) {
       const value = match[2].trim();
-      const oldValue = await memory.getPreference(key); 
+      const oldValue = await memory.getPreference(key);
       if (oldValue !== value) {
         await memory.savePreference(key, value);
         loadedLongTermMemory[key] = value; // Perbarui cache LTM
-        console.log(`[LTM Save Success] Preferensi baru/diperbarui: ${key} = "${value}"`);
+        console.log(
+          `[LTM Save Success] Preferensi baru/diperbarui: ${key} = "${value}"`
+        );
         preferenceChanged = true;
       } else {
-        console.log(`[LTM Skip] Preferensi ${key} sudah sama dengan nilai yang ada: "${value}"`);
+        console.log(
+          `[LTM Skip] Preferensi ${key} sudah sama dengan nilai yang ada: "${value}"`
+        );
       }
     }
   }
@@ -500,10 +658,11 @@ module.exports = {
       if (text.length === 1 && (isOnlyEmojis(text) || isOnlyNumbers(text)))
         return;
 
-        await relationState.addPointOnMessage(); 
+      await relationState.addPointOnMessage();
+      await updateInteractionStatus(); // Memanggil fungsi updateInteractionStatus setiap ada pesan
 
       // Panggil analyzeAndSavePreferences dan periksa apakah ada preferensi yang disimpan
-      const newPreferencesSaved = await analyzeAndSavePreferences(text); 
+      const newPreferencesSaved = await analyzeAndSavePreferences(text);
 
       if (newPreferencesSaved) {
         await AlyaTyping(currentMessageChatId);
@@ -533,14 +692,14 @@ module.exports = {
       const messageContext = contextManager.analyzeMessage(msg);
 
       const userMessageToStore = {
-          role: 'user',
-          content: text,
-          from: senderInfo,
-          chatId: chat.id, // Gunakan chatId (camelCase)
-          message_id: msg.message_id,
-          date: msg.date,
-          timestamp: new Date(msg.date * 1000).toISOString(),
-          context: messageContext // Simpan konteks yang dianalisis
+        role: "user",
+        content: text,
+        from: senderInfo,
+        chatId: chat.id,
+        message_id: msg.message_id,
+        date: msg.date,
+        timestamp: new Date(msg.date * 1000).toISOString(),
+        context: messageContext,
       };
 
       // Simpan pesan pengguna ke memori
@@ -557,7 +716,7 @@ module.exports = {
           content: messageContext.autoReply,
           timestamp: new Date().toISOString(),
           chatId: currentMessageChatId,
-          context: { topic: messageContext.topic, tone: "auto_reply" }, 
+          context: { topic: messageContext.topic, tone: "auto_reply" },
         });
         return;
       }
@@ -568,7 +727,6 @@ module.exports = {
           await AlyaTyping(currentMessageChatId);
           if (result.text) {
             sendMessage(currentMessageChatId, result.text);
-            // Tambahkan respons command ke memori
             await memory.addMessage({
               role: "assistant",
               content: result.text,
@@ -634,7 +792,7 @@ module.exports = {
         }
       );
 
-      // pembersihan cache dan memory (30 menit)
+      // Pembersihan cache dan memory (30 menit)
       setInterval(cleanupCacheAndMemory, CACHE_CLEANUP_INTERVAL_MS);
       console.log(
         `Pembersihan cache dan memori terjadwal setiap ${
@@ -646,11 +804,22 @@ module.exports = {
         updateTimeBasedModes(configuredChatId);
       });
 
-      // pembaruan ringkasan obrolan setiap jam
+      // Pembaruan ringkasan obrolan setiap jam
       schedule.scheduleJob(
         { rule: "0 * * * *", tz: "Asia/Jakarta" },
         updateChatSummary
       );
+
+      // Penjadwalan untuk sistem Ngambek (setiap hari pukul 00:00)
+      schedule.scheduleJob(
+        { rule: "0 0 * * *", tz: "Asia/Jakarta" },
+        async () => {
+          console.log("[Ngambek System] Memeriksa status ngambek Alya...");
+          await checkNgambekStatus(configuredChatId);
+        }
+      );
+      // Panggil sekali saat startup untuk memastikan status Ngambek yang benar
+      checkNgambekStatus(configuredChatId);
 
       // check hari libur dan kirim notifikasi jika hari libur
       if (config.calendarificApiKey) {
@@ -673,13 +842,13 @@ module.exports = {
     }
 
     // Tangani penutupan aplikasi untuk menutup database SQLite
-    process.on('SIGINT', async () => {
-      console.log('SIGINT received. Closing database connection...');
+    process.on("SIGINT", async () => {
+      console.log("SIGINT received. Closing database connection...");
       await memory.closeDb();
       process.exit(0);
     });
-    process.on('SIGTERM', async () => {
-      console.log('SIGTERM received. Closing database connection...');
+    process.on("SIGTERM", async () => {
+      console.log("SIGTERM received. Closing database connection...");
       await memory.closeDb();
       process.exit(0);
     });
