@@ -19,7 +19,7 @@ const { sendMessage } = require("../utils/sendMessage"); // Fungsi utilitas (unt
 const memory = require("../data/memory"); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
 const contextManager = require("../data/contextManager"); // MEMUAT CONTEXT MANAGER
 const schedule = require("node-schedule"); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
-const { getJakartaHour } = require("../utils/timeHelper"); // Fungsi utilitas untuk Zona Waktu
+const { getJakartaHour, formatJakartaDateTime } = require("../utils/timeHelper"); // Fungsi utilitas untuk Zona Waktu
 const {
   Mood,
   setMood,
@@ -41,7 +41,8 @@ const lists = require("../modules/commandLists"); // Untuk init reminder saat st
 const relationState = require("../modules/relationState"); // Atur poin & level relasi
 const newsManager = require("../modules/newsManager"); // Mengatur Berita harian dan ringkasannya
 const chatSummarizer = require("../modules/chatSummarizer"); // Untuk meringkas riwayat obrolan
-const loveState = require('../modules/loveStateManager');
+const chatFormatter = require("../utils/chatFormatter") // Format riwayat chat JSON menjadi text biasa
+const loveState = require('../modules/loveStateManager'); 
 const initTtsSchedules = require("../modules/ttsManager").initTtsSchedules;
 
 const Groq = require("groq-sdk"); // Import API Endpoints
@@ -52,7 +53,7 @@ const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
 const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
 const SLEEP_END_HOUR = 4; // Waktu berakhir tidur Alya (04:00 - 4 pagi)
-const CONVERSATION_HISTORY_LIMIT = 8; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI (dinaikkan sedikit untuk konteks yang lebih baik)
+const CONVERSATION_HISTORY_LIMIT = 4; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI 
 const CACHE_CLEANUP_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
 const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
@@ -71,7 +72,7 @@ let loadedLongTermMemory = {}; // Cache untuk memori jangka panjang
 let isNgambekMode = false; // Flag untuk menunjukkan apakah Alya dalam mode 'Ngambek'
 let lastInteractionTimestamp = null; // Waktu terakhir user berinteraksi
 let dailyChatCounts = {}; // { 'YYYY-MM-DD': count } - Melacak jumlah chat per hari
-const MIN_CHATS_PER_DAY_TO_END_NGAMBEK = 10;
+const MIN_CHATS_PER_DAY_TO_END_NGAMBEK = 6;
 const NGAMBEK_DURATION_DAYS = 2; // Durasi Alya ngambek jika tidak ada interaksi
 const END_NGAMBEK_INTERACTION_DAYS = 2; // Durasi interaksi untuk mengakhiri ngambek
 
@@ -131,10 +132,18 @@ const updateInteractionStatus = async () => {
   const now = new Date();
   lastInteractionTimestamp = now.toISOString();
   const today = now.toISOString().slice(0, 10); // Format YYYY-MM-DD
+
+  // Memuat dailyChatCounts dari memori. Pastikan ini adalah objek.
   const loadedCounts = await memory.getPreference("dailyChatCounts");
   dailyChatCounts = (loadedCounts && typeof loadedCounts === 'object') ? loadedCounts : {};
 
+  // Inisialisasi hitungan untuk hari ini jika belum ada
+  if (!dailyChatCounts[today]) {
+    dailyChatCounts[today] = 0;
+  }
 
+  // Tingkatkan hitungan untuk hari ini
+  dailyChatCounts[today]++;
 
   await memory.savePreference(
     "lastInteractionTimestamp",
@@ -240,6 +249,7 @@ async function generateAlyaPrompt({
   longTermMemory,
   isNgambekMode,
   isRomanceMode,
+  botName
 }) {
   const recentHistory = (await memory.getInMemoryHistory()).slice(
     -CONVERSATION_HISTORY_LIMIT
@@ -252,6 +262,12 @@ async function generateAlyaPrompt({
     : "";
   const relationDescription = relationState.getRelationLevelDescription();
   const currentPersonality = getPersonalityMode() || "TSUNDERE";
+  const formattedHistory = chatFormatter.formatChatHistoryForPrompt(
+    recentHistory,
+    USER_NAME,
+    botName 
+  );
+  const weather = await getWeatherData();
 
   let basePrompt = `Kamu adalah **Alya**, asisten pribadi ${USER_NAME}.`;
   basePrompt += ` Status hubunganmu dengan ${USER_NAME} saat ini ada di **${relationDescription}**. Sesuaikan cara bicaramu berdasarkan level ini.`;
@@ -301,7 +317,7 @@ async function generateAlyaPrompt({
   let userPreferences = "";
   const ltm = longTermMemory;
   if (Object.keys(ltm).length > 0) {
-    userPreferences += `\nBerikut adalah beberapa hal penting yang kamu ketahui tentang ${USER_NAME}:\n`;
+    userPreferences += `\n[${USER_NAME} Preferences] (jika ada)\n`;
     if (ltm.ulangTahun)
       userPreferences += `- Ulang tahun ${USER_NAME} pada tanggal ${ltm.ulangTahun}.\n`;
     if (ltm.makananFavorit)
@@ -318,21 +334,21 @@ async function generateAlyaPrompt({
 
   return `${basePrompt}
     ${personalityPrompt}
-    Mood kamu saat ini: **${mood}**.
     ${topicContext}
     ${
       summaryContext ? `Ringkasan percakapan sebelumnya: ${summaryContext}` : ""
     }
-    ${userPreferences}
-    Waktu sekarang: ${getJakartaHour()} WIB.
 
-    **Riwayat percakapan terakhir (${CONVERSATION_HISTORY_LIMIT} pesan):**
-    ${JSON.stringify(
-      recentHistory.map((msg) => ({
-        role: msg.role,
-        content: msg.content || msg.text,
-      }))
-    )}
+    ${formattedHistory} 
+
+    ${userPreferences}
+
+
+    [ Context Hari ini ]
+    
+    Mood kamu saat ini: **${mood}**.
+    Tanggal: ${formatJakartaDateTime()}
+    Cuaca: \n\n ${getWeatherString(weather)}
 
     **⚠️ Aturan Penting:**
     - **JANGAN PERNAH** menyebut dirimu sebagai AI, model bahasa, atau entitas non-manusia. Bertindaklah selalu sebagai Alya yang asli.
@@ -341,6 +357,7 @@ async function generateAlyaPrompt({
         - **Jika Deredere**: Bersikaplah ceria, manja, dan penuh kasih sayang.
     - Gunakan contoh ungkapan ini sebagai panduan dalam responsmu: ${examplePhrases}
     - Jaga konsistensi karakter dan perasaanmu di sepanjang percakapan.
+    Jangan berbicara terlalu panjang dan kurangi penggunaan kata yang tidak efektif (Kecuali dibutuhkan)
     `;
 }
 
@@ -425,12 +442,13 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
     longTermMemory,
     isNgambekMode,
     isRomanceMode: loveState.getRomanceStatus(),
+    botName: "Alya"
   });
-
   try {
     console.log(
       "Mengirim request ke Groq API dengan system prompt dan user prompt..."
     );
+    console.log(`[DEBUG] SystemPrompt: \n\n ${systemPrompt}`);
 
     const response = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
@@ -438,7 +456,7 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
       ],
-      max_tokens: 260, // max token untuk Alya
+      max_tokens: 480, // max token untuk Alya
       temperature: 0.85, // kreativitasnya
     });
 
