@@ -17,6 +17,7 @@ function analyzeLoveTrigger(userText) {
     "crush on you",
     "aku cinta kamu",
     "apa kamu suka aku",
+    "I love you"
   ];
 
   if (triggers.some((phrase) => text.includes(phrase))) {
