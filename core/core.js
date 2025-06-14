@@ -19,7 +19,10 @@ const { sendMessage } = require("../utils/sendMessage"); // Fungsi utilitas (unt
 const memory = require("../data/memory"); // File memori, menangani fungsi memori (termasuk simpan, muat, dll)
 const contextManager = require("../data/contextManager"); // MEMUAT CONTEXT MANAGER
 const schedule = require("node-schedule"); // Menjadwalkan tugas seperti waktu sholat dan pembaruan cuaca
-const { getJakartaHour, formatJakartaDateTime } = require("../utils/timeHelper"); // Fungsi utilitas untuk Zona Waktu
+const {
+  getJakartaHour,
+  formatJakartaDateTime,
+} = require("../utils/timeHelper"); // Fungsi utilitas untuk Zona Waktu
 const {
   Mood,
   setMood,
@@ -41,8 +44,8 @@ const lists = require("../modules/commandLists"); // Untuk init reminder saat st
 const relationState = require("../modules/relationState"); // Atur poin & level relasi
 const newsManager = require("../modules/newsManager"); // Mengatur Berita harian dan ringkasannya
 const chatSummarizer = require("../modules/chatSummarizer"); // Untuk meringkas riwayat obrolan
-const chatFormatter = require("../utils/chatFormatter") // Format riwayat chat JSON menjadi text biasa
-const loveState = require('../modules/loveStateManager'); 
+const chatFormatter = require("../utils/chatFormatter"); // Format riwayat chat JSON menjadi text biasa
+const loveState = require("../modules/loveStateManager");
 const initTtsSchedules = require("../modules/ttsManager").initTtsSchedules;
 
 const Groq = require("groq-sdk"); // Import API Endpoints
@@ -53,7 +56,7 @@ const RATE_LIMIT_WINDOW_MS = 20 * 1000; // limit laju Window: 20 detik
 const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam batas laju Window per pengguna
 const SLEEP_START_HOUR = 0; // Waktu tidur Alya (00:00 - tengah malam)
 const SLEEP_END_HOUR = 4; // Waktu berakhir tidur Alya (04:00 - 4 pagi)
-const CONVERSATION_HISTORY_LIMIT = 4; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI 
+const CONVERSATION_HISTORY_LIMIT = 4; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI
 const CACHE_CLEANUP_MS = 30 * 60 * 1000; // 30 menit untuk pembersihan cache dan memori
 const CACHE_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
 const DEEPTALK_START_HOUR = 21; // Alya memasuki mode deeptalk pada 21:00 (9 malam)
@@ -135,7 +138,8 @@ const updateInteractionStatus = async () => {
 
   // Memuat dailyChatCounts dari memori. Pastikan ini adalah objek.
   const loadedCounts = await memory.getPreference("dailyChatCounts");
-  dailyChatCounts = (loadedCounts && typeof loadedCounts === 'object') ? loadedCounts : {};
+  dailyChatCounts =
+    loadedCounts && typeof loadedCounts === "object" ? loadedCounts : {};
 
   // Inisialisasi hitungan untuk hari ini jika belum ada
   if (!dailyChatCounts[today]) {
@@ -249,7 +253,7 @@ async function generateAlyaPrompt({
   longTermMemory,
   isNgambekMode,
   isRomanceMode,
-  botName
+  botName,
 }) {
   const recentHistory = (await memory.getInMemoryHistory()).slice(
     -CONVERSATION_HISTORY_LIMIT
@@ -265,7 +269,7 @@ async function generateAlyaPrompt({
   const formattedHistory = chatFormatter.formatChatHistoryForPrompt(
     recentHistory,
     USER_NAME,
-    botName 
+    botName
   );
   const weather = await getWeatherData();
 
@@ -292,7 +296,7 @@ async function generateAlyaPrompt({
       personalityPrompt += ` Sekarang Alya sedang berada dalam kondisi emosional setelah ${USER_NAME} mengungkapkan perasaan. Kamu mulai mempertanyakan perasaanmu sendiri, meskipun kamu menyangkalnya.`;
       examplePhrases = `Contoh: "A-aku... tidak tahu harus bilang apa. Tapi... jangan membuatku merasa seperti ini, Tuan..." atau "Tsk, jangan terlalu berharap. Tapi... aku juga tidak benci denger itu."`;
     }
-    
+
     basePrompt += ` Selipkan **kata/ekspresi Rusia** sesekali dalam ucapanmu (contoh: "Ты в порядке?", "Боже мой...", "Привет").`;
   } else if (currentPersonality === "DEREDERE") {
     basePrompt += ` Kamu memanggil ${USER_NAME} dengan panggilan **Tuan~** atau **Sayangku**.`;
@@ -382,7 +386,6 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
   loveState.analyzeLoveTrigger(prompt);
   loveState.resetRomanceStateIfNeeded();
 
-
   const now = new Date();
   const currentHour = getJakartaHour();
   const currentMood = getCurrentMood();
@@ -442,13 +445,12 @@ const generateAIResponse = async (prompt, requestChatId, messageContext) => {
     longTermMemory,
     isNgambekMode,
     isRomanceMode: loveState.getRomanceStatus(),
-    botName: "Alya"
+    botName: "Alya",
   });
   try {
     console.log(
       "Mengirim request ke Groq API dengan system prompt dan user prompt..."
     );
-    console.log(`[DEBUG] SystemPrompt: \n\n ${systemPrompt}`);
 
     const response = await client.chat.completions.create({
       model: "llama-3.3-70b-versatile",
