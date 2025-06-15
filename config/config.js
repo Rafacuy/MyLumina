@@ -9,6 +9,7 @@ module.exports = {
     newsApiKey: process.env.NEWSAPI,
     USER_NAME: 'Arash', // Username
     TARGET_CHAT_ID: process.env.TARGET_CHAT_ID,
+    sentryDsn: process.env.DSN_KEY,
     weatherApiKey: process.env.WEATHER_API_KEY,
     calendarificApiKey: process.env.CALENDARIFIC_API_KEY,
     GOOGLE_SEARCH_API_KEY: process.env.GOOGLE_SEARCH_API_KEY,
