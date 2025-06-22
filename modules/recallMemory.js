@@ -1,24 +1,14 @@
 // modules/recallMemory.js
 const memory = require("../data/memory");
 const { sendMessage } = require("../utils/sendMessage");
-const { getRandomMood, getPersonalityMode } = require("./commandHandlers");
+const { getPersonalityMode } = require("../handler/commandHandlers"); // Hapus getRandomMood jika tidak digunakan
 const config = require("../config/config");
-const pino = require("pino");
-
-const logger = pino({
-  transport: {
-    target: "pino-pretty",
-    options: {
-      colorize: true,
-      ignore: "pid,hostname",
-      translateTime: "SYS:standard",
-    },
-  },
-});
+const logger = require('../utils/logger'); // Mengimpor logger yang sudah dikonfigurasi
+const Sentry = require('@sentry/node'); // Mengimpor Sentry
 
 const RECALL_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 jam cooldown
 
-let lastRecallTime = 0; // Waktu terakhir Alya mengingat sesuatu
+let lastRecallTime = 0; // Waktu terakhir Lumina mengingat sesuatu
 
 /**
  * Mengingat satu memori secara acak dan mengirimkannya ke pengguna.
@@ -41,7 +31,7 @@ const recallRandomMemory = async (chatId) => {
         key !== "isNgambekMode" &&
         key !== "lastInteractionTimestamp" &&
         key !== "dailyChatCounts"
-    ); // Filter preferensi internal Alya
+    ); // Filter preferensi internal Lumina
 
     if (preferences.length === 0) {
       logger.info(
@@ -54,53 +44,60 @@ const recallRandomMemory = async (chatId) => {
     const randomKey =
       preferences[Math.floor(Math.random() * preferences.length)];
     const value = longTermMemory[randomKey];
-    if (!value || typeof value !== "string") return;
+    if (!value || typeof value !== "string") {
+      logger.warn({
+        event: "recall_memory_invalid_value",
+        key: randomKey,
+        value: value
+      }, "Nilai preferensi tidak valid atau kosong, dilewati.");
+      return;
+    }
 
     let recallMessage = "";
-    const currentPersonality = getPersonalityMode() || "TSUNDERE";
-    const userName = config.USER_NAME;
+    const currentPersonality = getPersonalityMode() || "TSUNDERE"; // default jika tidak ada mode
+    const userName = config.USER_NAME; 
 
     switch (randomKey) {
       case "musikKesukaan":
         if (currentPersonality === "TSUNDERE") {
           recallMessage = `Hmph, ingatanku kuat sekali. Kau bilang suka lagu "${value}" kan? Jangan GR, itu cuma karena aku iseng.`;
         } else if (currentPersonality === "DEREDERE") {
-          recallMessage = `Tuan~ Alya ingat loh, kamu suka sekali lagu "${value}"! Apa kita dengarkan bersama? 🎶`;
+          recallMessage = `Tuan~ Lumina ingat loh, kamu suka sekali lagu "${value}"! Apa kita dengarkan bersama? 🎶`;
         }
         break;
       case "ulangTahun":
         if (currentPersonality === "TSUNDERE") {
           recallMessage = `Kau ulang tahun tanggal ${value}, kan? Cih, bukan berarti aku peduli. Hanya kebetulan ingat.`;
         } else if (currentPersonality === "DEREDERE") {
-          recallMessage = `Sayangku, Alya ingat! Ulang tahunmu tanggal ${value}, kan? Alya tidak sabar merayakannya! 🎉`;
+          recallMessage = `Sayangku, Lumina ingat! Ulang tahunmu tanggal ${value}, kan? Lumina tidak sabar merayakannya! 🥳`;
         }
         break;
       case "makananFavorit":
         if (currentPersonality === "TSUNDERE") {
           recallMessage = `Hey, Makanan favoritmu "${value}", ya? Aku tidak mengerti apa enaknya. E-Eh.. Kenapa aku tiba tiba inget ya?`;
         } else if (currentPersonality === "DEREDERE") {
-          recallMessage = `Alya ingat! Kamu suka "${value}", kan? Wah, jadi ingin memasak untukmu, Sayangku~! 😋`;
+          recallMessage = `Lumina ingat! Kamu suka "${value}", kan? Wah, jadi ingin memasak untukmu, Sayangku~! 💖`;
         }
         break;
       case "filmKesukaan":
         if (currentPersonality === "TSUNDERE") {
           recallMessage = `Oh.. Jadi Film kesukaanmu "${value}"? Membosankan. Tapi ya sudah, itu seleramu.`;
         } else if (currentPersonality === "DEREDERE") {
-          recallMessage = `Tuan, Alya ingin menonton "${value}" bersamamu! Pasti seru sekali! 🎬`;
+          recallMessage = `Tuan, Lumina ingin menonton "${value}" bersamamu! Pasti seru sekali! `;
         }
         break;
       case "hobi":
         if (currentPersonality === "TSUNDERE") {
           recallMessage = `Jadi hobimu "${value}". Tidak menarik. Tapi kalau itu membuatmu senang... ya sudah.`;
         } else if (currentPersonality === "DEREDERE") {
-          recallMessage = `Sayangku, Alya suka sekali kalau kamu melakukan hobimu "${value}"! Pasti menyenangkan ya! ✨`;
+          recallMessage = `Sayangku, Lumina suka sekali kalau kamu melakukan hobimu "${value}"! Pasti menyenangkan ya! 😊`;
         }
         break;
       case "warnaFavorit":
         if (currentPersonality === "TSUNDERE") {
           recallMessage = `Warna favoritmu "${value}", 'kan? Hmm.. Yaudah sih, kok aku tiba tiba inget ya?`;
         } else if (currentPersonality === "DEREDERE") {
-          recallMessage = `Alya suka warna "${value}" karena itu warna favoritmu, Tuan~! Cantik sekali! 🎨`;
+          recallMessage = `Lumina suka warna "${value}" karena itu warna favoritmu, Tuan~! Cantik sekali! 🎀`;
         }
         break;
       default:
@@ -108,7 +105,7 @@ const recallRandomMemory = async (chatId) => {
         if (currentPersonality === "TSUNDERE") {
           recallMessage = `Hmph, aku ingat kau pernah bilang tentang "${value}". Entah kenapa aku mengingatnya.`;
         } else if (currentPersonality === "DEREDERE") {
-          recallMessage = `Sayangku, Alya ingat kamu pernah bilang tentang "${value}"! Itu sangat menarik! 😊`;
+          recallMessage = `Sayangku, Lumina ingat kamu pernah bilang tentang "${value}"! Itu sangat menarik! ✨`;
         }
         break;
     }
@@ -122,8 +119,9 @@ const recallRandomMemory = async (chatId) => {
           chatId: chatId,
           key: randomKey,
           value: value,
+          personality: currentPersonality
         },
-        `Alya recalled memory: ${recallMessage}`
+        `Lumina recalled memory: ${recallMessage}`
       );
     }
   } catch (error) {
@@ -135,6 +133,7 @@ const recallRandomMemory = async (chatId) => {
       },
       "Error recalling random memory:"
     );
+    Sentry.captureException(error); 
   }
 };
 

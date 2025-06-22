@@ -12,7 +12,6 @@ function analyzeLoveTrigger(userText) {
   const triggers = [
     "aku suka kamu",
     "i like you",
-    "punya rasa",
     "jatuh cinta",
     "crush on you",
     "aku cinta kamu",

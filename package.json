@@ -1,7 +1,7 @@
 {
-  "name": "alya-chatbot",
-  "version": "6.1.0",
-  "description": "Chatbot Alya yang siap nemenin kamu saat kesepian! >V<",
+  "name": "lumina-dualiteai",
+  "version": "1.0",
+  "description": "DualiteAI yang siap nemenin kamu saat kesepian! >V<",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,14 +9,20 @@
   "dependencies": {
     "@huggingface/inference": "^3.15.0",
     "@sentry/node": "^9.29.0",
-    "axios": "^1.4.0",
+    "@sentry/tracing": "^7.120.3",
+    "axios": "^1.10.0",
     "dotenv": "^16.0.3",
+    "express": "^5.1.0",
+    "fast-redact": "^3.5.0",
+    "form-data": "^4.0.3",
     "groq-sdk": "^0.23.0",
     "moment-timezone": "^0.6.0",
     "newsapi": "^2.4.1",
     "node-schedule": "^2.1.1",
-    "node-telegram-bot-api": "^0.61.0",
+    "node-telegram-bot-api": "^0.63.0",
+    "openai": "^5.5.1",
     "pino": "^9.7.0",
+    "sharp": "^0.34.2",
     "sqlite3": "^5.1.7",
     "together-ai": "^0.16.0"
   },
