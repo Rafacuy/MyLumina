@@ -1,4 +1,4 @@
-// modules/relationState.js
+// handler/relationHandler.js
 // AUTHOR: Arash
 // DESCRIPTION: Mengelola status relasi, poin, dan level antara Chatbot dan User
 
@@ -94,7 +94,7 @@ function updateLevel() {
 
     if (newLevel !== oldLevel) {
         currentState.level = newLevel;
-        console.log(`🎉 LEVEL UP! Alya sekarang berada di Level ${newLevel}: ${LEVEL_DESCRIPTIONS[newLevel]}`);
+        console.log(`🎉 LEVEL UP! Lumina sekarang berada di Level ${newLevel}: ${LEVEL_DESCRIPTIONS[newLevel]}`);
         return true;
     }
     return false;
@@ -121,7 +121,6 @@ async function addPoints(pointsToAdd) {
  * Akan dipanggil dari core.js
  */
 async function addPointOnMessage() {
-    console.log(`[DEBUG - RelationState] Fungsi addPointOnMessage dipanggil.`); 
     await addPoints(POINTS_PER_MESSAGE);
     console.log(`[RelationState] Poin bertambah ${POINTS_PER_MESSAGE} dari interaksi pesan.`)
 }

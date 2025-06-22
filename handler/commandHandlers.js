@@ -1,28 +1,34 @@
-// modules/commandHandlers.js
+// handler/commandHandlers.js
 
 const { sendMessage } = require('../utils/sendMessage'); // Utilities for sending messages
-const commandHelper = require('./commandLists'); // Utilities for commands
+const commandHelper = require('../modules/commandLists'); // Utilities for commands
 const config = require('../config/config'); // Configuration File
-const Mood = require('./mood');
-const { getWeatherData, getWeatherString, getWeatherReminder } = require('./weather'); // Weather utility
-const holidaysModule = require('./holidays');
+const Mood = require('../modules/mood');
+const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather'); // Weather utility
+const holidaysModule = require('./holidayHandlers');
+const memory = require('../data/memory');
 const sendSadSongNotification = require('../utils/songNotifier')
 
-// 🌸 Alya Configuration
+// 🌸 Lumina Configuration
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
 const USER_NAME = config.USER_NAME;
 
 // Global State Variables
-let currentMood = Mood.NORMAL; // Mood Alya saat ini
+let currentMood = Mood.NORMAL; // Mood Lumina saat ini
 let moodTimeoutId; // Menyimpan ID timeout reset mood
 let botInstanceRef; // Referensi ke instance bot Telegram
 let globalAISummarizer = null;
 
 let personalityMode = 'TSUNDERE'; // Default personality mode: 'TSUNDERE' or 'DEREDERE'
 
-const setPersonalityMode = (mode) => {
+const setPersonalityMode = async (mode) => {
     personalityMode = mode;
-    console.log(`[Personality] Alya's personality mode set to: ${personalityMode}`);
+    try {
+        await memory.savePreference("lumina_personality", mode);
+        console.log(`[Personality] Mode kepribadian diubah menjadi: ${personalityMode} dan berhasil disimpan.`);
+    } catch (error) {
+        console.error("[Personality] Gagal menyimpan mode kepribadian:", error);
+    }
 };
 
 const getPersonalityMode = () => personalityMode;
@@ -39,7 +45,7 @@ const getAISummarizer = () => globalAISummarizer;
  * @param {string|number} chatId ID obrolan tempat aksi mengetik harus ditampilkan.
  * @param {number} duration Durasi dalam milidetik untuk menampilkan aksi mengetik.
  */
-const AlyaTyping = async (chatId, duration = 1500) => {
+const LuminaTyping = async (chatId, duration = 1500) => {
     if (!botInstanceRef) {
         console.warn("Instance bot belum diinisialisasi untuk aksi mengetik. Tidak dapat mengirim indikator mengetik.");
         return;
@@ -48,13 +54,13 @@ const AlyaTyping = async (chatId, duration = 1500) => {
         await botInstanceRef.sendChatAction(chatId, 'typing');
         return new Promise(resolve => setTimeout(resolve, duration));
     } catch (error) {
-        console.error(`Error in AlyaTyping for chat ID ${chatId}:`, error.message);
+        console.error(`Error in LuminaTyping for chat ID ${chatId}:`, error.message);
     }
 };
 
 
 /**
- * Mengatur mood Alya dan menjadwalkan reset kembali ke 'NORMAL' setelah durasi tertentu.
+ * Mengatur mood Lumina dan menjadwalkan reset kembali ke 'NORMAL' setelah durasi tertentu.
  * Jika mood baru sudah menjadi mood saat ini, tidak ada tindakan yang diambil untuk menghindari pesan berlebihan.
  * Mood seperti 'CALM' (untuk deeptalk) tidak direset secara otomatis.
  * @param {string|number} chatId ID obrolan untuk mengirim pesan status mood.
@@ -68,7 +74,7 @@ const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
     if (currentMood !== newMood) {
         currentMood = newMood;
         if (chatId) {
-            sendMessage(chatId, `Alya sedang ${newMood.name} ${newMood.emoji}`);
+            sendMessage(chatId, `Lumina sedang ${newMood.name} ${newMood.emoji}`);
         }
     }
 
@@ -77,7 +83,7 @@ const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
         moodTimeoutId = setTimeout(() => {
             currentMood = Mood.NORMAL;
             if (chatId) {
-                sendMessage(chatId, `Alya kembali normal ${Mood.NORMAL.emoji}`);
+                sendMessage(chatId, `Lumina kembali normal ${Mood.NORMAL.emoji}`);
             }
         }, durationMs);
     }
@@ -100,7 +106,7 @@ const commandHandlers = [
         response: (chatId) => { // Tambahkan chatId sebagai argumen
             const greeting = personalityMode === 'TSUNDERE' ?
                 `Hmph, apa maumu, Tuan? ${currentMood.emoji}` :
-                `Halo, Tuan~! Alya senang kamu di sini! ${currentMood.emoji}`;
+                `Halo, Tuan~! Lumina senang kamu di sini! ${currentMood.emoji}`;
             return {
                 text: greeting,
                 mood: Mood.HAPPY // Mood yang akan diatur setelah perintah ini
@@ -112,7 +118,7 @@ const commandHandlers = [
         response: (chatId) => { // Tambahkan chatId sebagai argumen
             const thanksResponse = personalityMode === 'TSUNDERE' ?
                 `J-jangan berlebihan! Aku cuma melakukan tugasku. ${Mood.NORMAL.emoji}` :
-                `*Giggle* Makasih, Tuan~! Alya senang bisa bantu! >_< ${Mood.HAPPY.emoji}`;
+                `*Giggle* Makasih, Tuan~! Lumina senang bisa bantu! >_< ${Mood.HAPPY.emoji}`;
             return {
                 text: thanksResponse,
                 mood: Mood.HAPPY
@@ -122,31 +128,31 @@ const commandHandlers = [
     {
         pattern: /(siapa kamu|kamu siapa)/i,
         response: () => ({
-            text: `Saya Alya, asisten virtual ${USER_NAME}. Ada yang bisa saya bantu? ${Mood.NORMAL.emoji}`,
+            text: `Saya Lumina, asisten virtual ${USER_NAME}. Ada yang bisa saya bantu? ${Mood.NORMAL.emoji}`,
             mood: Mood.NORMAL
         })
     },
     {
         pattern: /(lagi apa|lagi ngapain)/i,
         response: () => ({
-            text: `Alya sedang siap sedia untuk membantu Anda, Tuan ${USER_NAME}. Ada yang bisa saya lakukan? ${Mood.NORMAL.emoji}`,
+            text: `Lumina sedang siap sedia untuk membantu Anda, Tuan ${USER_NAME}. Ada yang bisa saya lakukan? ${Mood.NORMAL.emoji}`,
             mood: Mood.NORMAL
         })
     },
     {
         pattern: /^(mood|suasana hati)/i,
         response: () => ({
-            text: `Mood Alya saat ini sedang ${currentMood.name} ${currentMood.emoji}`,
+            text: `Mood Lumina saat ini sedang ${currentMood.name} ${currentMood.emoji}`,
             mood: currentMood
         })
     },
     {
         pattern: /^\/cuaca/i,
         response: async (chatId) => {
-            await AlyaTyping(chatId);
+            await LuminaTyping(chatId);
             const weatherCheckMessage = personalityMode === 'TSUNDERE' ?
-                `Cuaca, huh? Hmph.. Baiklah, Alya akan cek cuacanya, tunggu bentar..` :
-                `Oke, Tuan~! Alya akan cek cuaca untukmu! Sebentar ya~`;
+                `Cuaca, huh? Hmph.. Baiklah, Lumina akan cek cuacanya, tunggu bentar..` :
+                `Oke, Tuan~! Lumina akan cek cuaca untukmu! Sebentar ya~`;
             sendMessage(chatId, weatherCheckMessage);
             const weather = await getWeatherData();
             if (weather) {
@@ -156,7 +162,7 @@ const commandHandlers = [
                 };
             } else {
                 return {
-                    text: `Hmm... Alya kek nya. ${Mood.SAD.emoji}`,
+                    text: `Hmm... Lumina kek nya. ${Mood.SAD.emoji}`,
                     mood: Mood.SAD
                 };
             }
@@ -212,7 +218,7 @@ const commandHandlers = [
     {
         pattern: /^\/reminder\s+(\S+)\s+(.+)/i,
         response: async (chatId, msg) => {
-            await AlyaTyping(chatId);
+            await LuminaTyping(chatId);
             const [, timeString, message] = msg.text.match(/^\/reminder\s+(\S+)\s+(.+)/i);
             const userName = msg.from.first_name || msg.from.username || 'Tuan';
             const responseText = await commandHelper.setReminder(botInstanceRef, chatId, timeString, message, userName);
@@ -222,7 +228,7 @@ const commandHandlers = [
     {
         pattern: /^\/note\s+(.+)/i,
         response: async (chatId, msg) => {
-            await AlyaTyping(chatId);
+            await LuminaTyping(chatId);
             const [, noteMessage] = msg.text.match(/^\/note\s+(.+)/i);
             const userId = msg.from.id;
             const responseText = await commandHelper.addNote(userId, noteMessage);
@@ -232,13 +238,12 @@ const commandHandlers = [
     {
         pattern: /^\/shownotes/i,
         response: async (chatId, msg) => {
-            await AlyaTyping(chatId);
+            await LuminaTyping(chatId);
             const userId = msg.from.id;
             const responseText = await commandHelper.showNotes(userId);
             return { text: responseText, mood: Mood.NORMAL };
         }
     },
-    // Perintah baru: Search
     {
         pattern: /^\/search\s+(.+)$/i,
         response: async (chatId, msg) => {
@@ -254,8 +259,8 @@ const commandHandlers = [
                 const userNameForCommand = msg.from.first_name || USER_NAME;
 
                 if (query) {
-                    await AlyaTyping(chatId);
-                    sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Alya akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
+                    await LuminaTyping(chatId);
+                    sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Lumina akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
 
 
                     const searchResultText = await commandHelper.performSearch(
@@ -277,7 +282,7 @@ const commandHandlers = [
     {
         pattern: /^\/help/i,
         response: async (chatId) => {
-            await AlyaTyping(chatId);
+            await LuminaTyping(chatId);
             const responseText = commandHelper.getHelpMessage();
             return { text: responseText, mood: Mood.NORMAL };
         }
@@ -285,7 +290,7 @@ const commandHandlers = [
     {
         pattern: /^\/author/i,
         response: async (chatId) => {
-            await AlyaTyping(chatId);
+            await LuminaTyping(chatId);
             const responseText = commandHelper.getAuthorInfo();
             return { text: responseText, mood: Mood.NORMAL };
         }
@@ -294,9 +299,9 @@ const commandHandlers = [
     {
         pattern: /^\/tsundere/i,
         response: async (chatId) => {
-            setPersonalityMode('TSUNDERE');
+            await setPersonalityMode('TSUNDERE');
             return {
-                text: `Hmph, baiklah! Alya akan kembali ke mode Tsundere. Jangan harap aku jadi manis, Idiot! 🔥`,
+                text: `Hmph, baiklah! Lumina akan kembali ke mode Tsundere. Jangan harap aku jadi manis, Idiot! 🔥`,
                 mood: Mood.ANGRY 
             };
         }
@@ -304,9 +309,9 @@ const commandHandlers = [
     {
         pattern: /^\/deredere/i,
         response: async (chatId) => {
-            setPersonalityMode('DEREDERE');
+            await setPersonalityMode('DEREDERE');
             return {
-                text: `Kyaa~! Oke, Tuan~ Alya akan jadi manis dan ramah untukmu! 🌸`,
+                text: `Kyaa~! Oke, Tuan~ Lumina akan jadi manis dan ramah untukmu! 🌸`,
                 mood: Mood.LOVING 
             };
         }
@@ -317,16 +322,14 @@ if (config.calendarificApiKey) {
     commandHandlers.push({
         pattern: /^\/(hariini|liburhariini|infohari)$/i,
         response: async (chatId, msg) => {
-            await AlyaTyping(chatId);
+            await LuminaTyping(chatId);
 
             const holidayMessage = await holidaysModule.getFormattedTodaysHolidays(
                 config.calendarificApiKey,
-                'ID', // Ganti 'ID' dengan kode negara yang diinginkan jika perlu
+                'ID',
                 config.USER_NAME // Mengambil USER_NAME dari config untuk personalisasi
             );
 
-            // Berdasarkan struktur commandHandlers di core.js yang Anda berikan,
-            // handler harus mengembalikan objek dengan properti 'text'.
             return { text: holidayMessage };
         }
     });
@@ -345,8 +348,8 @@ const setBotInstance = (bot) => {
 };
 
 /**
- * Mengembalikan mood Alya saat ini.
- * @returns {object} Objek mood Alya saat ini.
+ * Mengembalikan mood Lumina saat ini.
+ * @returns {object} Objek mood Lumina saat ini.
  */
 const getCurrentMood = () => currentMood;
 
@@ -357,7 +360,8 @@ module.exports = {
     commandHandlers,
     setBotInstance,
     getCurrentMood,
-    AlyaTyping,
+    LuminaTyping,
     setAISummarizer,
-    getPersonalityMode 
+    getPersonalityMode,
+    setPersonalityMode 
 };

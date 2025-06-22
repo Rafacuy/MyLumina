@@ -5,7 +5,7 @@
  * ...
  * @param {Array<Object>} chatHistory Array objek pesan dari memory.js.
  * @param {string} userName Nama pengguna untuk identifikasi pesan dari user.
- * @param {string} botName Nama bot (Alya) untuk identifikasi pesan dari bot.
+ * @param {string} botName Nama bot (Lumina) untuk identifikasi pesan dari bot.
  * @returns {string} Riwayat chat yang diformat sebagai string teks.
  */
 function formatChatHistoryForPrompt(chatHistory, userName, botName) {
