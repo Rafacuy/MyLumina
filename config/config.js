@@ -2,12 +2,11 @@
 
 module.exports = {
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN,
-    WEBHOOK_URL: process.env.WEBHOOK_URL,
     openRouterApiKey: process.env.OPENROUTER_API_KEY, // OpenRouterAPI
     openRouterModel: process.env.OPENROUTER_MODEL || 'qwen/qwen3-4b:free',
     togetherAiApiKey: process.env.TOGETHER_API_KEY, // Together.ai API
     groqApiKey: process.env.GROQ_API_KEY, // Groq API Key
-    PORT: process.env.PORT,
+    PORT: process.env.PORT || 3000,
     newsApiKey: process.env.NEWSAPI,
     ocrSpaceApiKey: process.env.OCR_API_KEY,
     imaggaApiKey: process.env.IMAGGA_API_KEY,
