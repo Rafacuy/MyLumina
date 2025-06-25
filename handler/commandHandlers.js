@@ -8,8 +8,10 @@ const { getWeatherData, getWeatherString, getWeatherReminder } = require('../mod
 const holidaysModule = require('./holidayHandlers');
 const memory = require('../data/memory');
 const sendSadSongNotification = require('../utils/songNotifier')
+const logger = require('../utils/logger');
+const Sentry = require('@sentry/node'); 
 
-// 🌸 Lumina Configuration
+// Lumina Configuration
 const MOOD_TIMEOUT_MS = 2 * 24 * 60 * 60 * 1000; // Mood duration: 2 days (in miliseconds)
 const USER_NAME = config.USER_NAME;
 
@@ -21,13 +23,18 @@ let globalAISummarizer = null;
 
 let personalityMode = 'TSUNDERE'; // Default personality mode: 'TSUNDERE' or 'DEREDERE'
 
+/**
+ * Sets the personality mode and saves it to memory.
+ * @param {string} mode - The personality mode to set ('TSUNDERE' or 'DEREDERE').
+ */
 const setPersonalityMode = async (mode) => {
     personalityMode = mode;
     try {
         await memory.savePreference("lumina_personality", mode);
-        console.log(`[Personality] Mode kepribadian diubah menjadi: ${personalityMode} dan berhasil disimpan.`);
+        logger.info({ event: 'personality_change', mode: personalityMode }, `[Personality] Mode kepribadian diubah menjadi: ${personalityMode} dan berhasil disimpan.`);
     } catch (error) {
-        console.error("[Personality] Gagal menyimpan mode kepribadian:", error);
+        logger.error({ event: 'personality_save_error', error: error.message, stack: error.stack }, "[Personality] Gagal menyimpan mode kepribadian:");
+        Sentry.captureException(error);
     }
 };
 
@@ -39,7 +46,6 @@ const setAISummarizer = (fn) => {
 
 const getAISummarizer = () => globalAISummarizer;
 
-
 /**
  * Mensimulasikan aksi bot mengetik di obrolan tertentu untuk durasi yang ditentukan.
  * @param {string|number} chatId ID obrolan tempat aksi mengetik harus ditampilkan.
@@ -47,41 +53,39 @@ const getAISummarizer = () => globalAISummarizer;
  */
 const LuminaTyping = async (chatId, duration = 1500) => {
     if (!botInstanceRef) {
-        console.warn("Instance bot belum diinisialisasi untuk aksi mengetik. Tidak dapat mengirim indikator mengetik.");
+        logger.warn({ event: 'typing_action_failed', reason: 'bot_instance_not_set' }, "Instance bot belum diinisialisasi. Tidak dapat mengirim indikator mengetik.");
         return;
     }
     try {
         await botInstanceRef.sendChatAction(chatId, 'typing');
         return new Promise(resolve => setTimeout(resolve, duration));
     } catch (error) {
-        console.error(`Error in LuminaTyping for chat ID ${chatId}:`, error.message);
+        logger.error({ event: 'typing_action_error', chatId: chatId, error: error.message, stack: error.stack }, `Error in LuminaTyping for chat ID ${chatId}`);
+        Sentry.captureException(error, { extra: { chatId } });
     }
 };
 
-
 /**
  * Mengatur mood Lumina dan menjadwalkan reset kembali ke 'NORMAL' setelah durasi tertentu.
- * Jika mood baru sudah menjadi mood saat ini, tidak ada tindakan yang diambil untuk menghindari pesan berlebihan.
- * Mood seperti 'CALM' (untuk deeptalk) tidak direset secara otomatis.
  * @param {string|number} chatId ID obrolan untuk mengirim pesan status mood.
  * @param {object} newMood Objek mood baru (dari konstanta Mood) untuk diatur.
  * @param {number} durationMs Durasi dalam milidetik untuk mood baru bertahan.
  */
 const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
-    clearTimeout(moodTimeoutId); // Hapus reset mood yang sebelumnya dijadwalkan
+    clearTimeout(moodTimeoutId);
 
-    // Hanya perbarui dan umumkan mood jika benar-benar berubah
     if (currentMood !== newMood) {
         currentMood = newMood;
+        logger.info({ event: 'mood_change', mood: newMood.name, chatId }, `Mood changed to ${newMood.name}`);
         if (chatId) {
             sendMessage(chatId, `Lumina sedang ${newMood.name} ${newMood.emoji}`);
         }
     }
 
-    // Jadwalkan reset mood hanya jika mood baru bukan 'NORMAL' atau 'CALM'
     if (newMood !== Mood.NORMAL && newMood !== Mood.CALM) {
         moodTimeoutId = setTimeout(() => {
             currentMood = Mood.NORMAL;
+            logger.info({ event: 'mood_reset', chatId }, `Mood reset to NORMAL`);
             if (chatId) {
                 sendMessage(chatId, `Lumina kembali normal ${Mood.NORMAL.emoji}`);
             }
@@ -89,9 +93,8 @@ const setMood = (chatId, newMood, durationMs = MOOD_TIMEOUT_MS) => {
     }
 };
 
-
 /**
- * Mendapatkan mood acak dari konstanta Mood yang telah ditentukan, tidak termasuk mood yang ditujukan untuk mode tertentu (seperti CALM).
+ * Mendapatkan mood acak dari konstanta Mood yang telah ditentukan.
  * @returns {object} Objek mood yang dipilih secara acak.
  */
 const getRandomMood = () => {
@@ -100,22 +103,54 @@ const getRandomMood = () => {
     return moods[randomIndex];
 };
 
+
 const commandHandlers = [
     {
-        pattern: /^(hai|halo|bot|helo|haii|woy|hoy)/i, // Pola regex untuk dicocokkan
-        response: (chatId) => { // Tambahkan chatId sebagai argumen
+        pattern: /^\/start$/i,
+        response: (chatId, msg) => {
+            const userFirstName = msg.from.first_name || USER_NAME;
+            const startMessage = `
+🌸 Selamat Datang, Tuan ${userFirstName}! 🌸
+
+Saya Lumina, asisten virtual pribadi Anda. Saya di sini untuk membantu Anda dengan berbagai tugas dan membuat hari Anda lebih mudah!
+
+Anda dapat berinteraksi dengan saya menggunakan bahasa natural atau menggunakan beberapa perintah cepat di bawah ini:
+
+- /help - Menampilkan pesan bantuan ini.
+- /cuaca - Mendapatkan informasi cuaca terkini.
+- /mood - Mengecek suasana hati saya saat ini.
+- /note [pesan] - Menyimpan catatan singkat.
+- /shownotes - Menampilkan semua catatan Anda.
+- /reminder [waktu] [pesan] - Mengatur pengingat.
+- /search [kueri] - Mencari informasi di web dan merangkumnya.
+
+Saya juga memiliki dua mode kepribadian yang bisa Anda ubah:
+- /tsundere - Mode standar saya, sedikit jual mahal tapi peduli.
+- /deredere - Mode yang lebih manis, ceria, dan penyayang.
+
+Silakan coba salah satu perintah atau ajak saya mengobrol! ${Mood.HAPPY.emoji}`;
+
+            return {
+                text: startMessage,
+                mood: Mood.HAPPY
+            };
+        }
+    },
+    {
+        pattern: /^(hai|halo|bot|helo|haii|woy|hoy)/i,
+        response: (chatId) => {
             const greeting = personalityMode === 'TSUNDERE' ?
                 `Hmph, apa maumu, Tuan? ${currentMood.emoji}` :
                 `Halo, Tuan~! Lumina senang kamu di sini! ${currentMood.emoji}`;
             return {
                 text: greeting,
-                mood: Mood.HAPPY // Mood yang akan diatur setelah perintah ini
+                mood: Mood.HAPPY
             };
         }
     },
     {
         pattern: /^(terima kasih|makasih|makasih ya)/i,
-        response: (chatId) => { // Tambahkan chatId sebagai argumen
+        response: () => {
             const thanksResponse = personalityMode === 'TSUNDERE' ?
                 `J-jangan berlebihan! Aku cuma melakukan tugasku. ${Mood.NORMAL.emoji}` :
                 `*Giggle* Makasih, Tuan~! Lumina senang bisa bantu! >_< ${Mood.HAPPY.emoji}`;
@@ -127,15 +162,18 @@ const commandHandlers = [
     },
     {
         pattern: /(siapa kamu|kamu siapa)/i,
-        response: () => ({
-            text: `Saya Lumina, asisten virtual ${USER_NAME}. Ada yang bisa saya bantu? ${Mood.NORMAL.emoji}`,
-            mood: Mood.NORMAL
-        })
+        response: (chatId, msg) => {
+            const userName = msg.from.first_name || 'Tuan';
+            return {
+                text: `Saya Lumina, asisten virtual ${userName}. Ada yang bisa saya bantu? ${Mood.NORMAL.emoji}`,
+                mood: Mood.NORMAL
+            };
+        }
     },
     {
         pattern: /(lagi apa|lagi ngapain)/i,
         response: () => ({
-            text: `Lumina sedang siap sedia untuk membantu Anda, Tuan ${USER_NAME}. Ada yang bisa saya lakukan? ${Mood.NORMAL.emoji}`,
+            text: `Lumina sedang siap sedia untuk membantu Anda, Tuan. Ada yang bisa saya lakukan? ${Mood.NORMAL.emoji}`,
             mood: Mood.NORMAL
         })
     },
@@ -149,22 +187,28 @@ const commandHandlers = [
     {
         pattern: /^\/cuaca/i,
         response: async (chatId) => {
-            await LuminaTyping(chatId);
-            const weatherCheckMessage = personalityMode === 'TSUNDERE' ?
-                `Cuaca, huh? Hmph.. Baiklah, Lumina akan cek cuacanya, tunggu bentar..` :
-                `Oke, Tuan~! Lumina akan cek cuaca untukmu! Sebentar ya~`;
-            sendMessage(chatId, weatherCheckMessage);
-            const weather = await getWeatherData();
-            if (weather) {
-                return {
-                    text: `🌸 Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`,
-                    mood: currentMood
-                };
-            } else {
-                return {
-                    text: `Hmm... Lumina kek nya. ${Mood.SAD.emoji}`,
-                    mood: Mood.SAD
-                };
+            try {
+                await LuminaTyping(chatId);
+                const weatherCheckMessage = personalityMode === 'TSUNDERE' ?
+                    `Cuaca, huh? Hmph.. Baiklah, Lumina akan cek cuacanya, tunggu bentar..` :
+                    `Oke, Tuan~! Lumina akan cek cuaca untukmu! Sebentar ya~`;
+                sendMessage(chatId, weatherCheckMessage);
+                const weather = await getWeatherData();
+                if (weather) {
+                    return {
+                        text: `Cuaca hari ini:\n${getWeatherString(weather)}\n${getWeatherReminder(weather)}`,
+                        mood: currentMood
+                    };
+                } else {
+                    return {
+                        text: `Maaf, Tuan. Lumina tidak berhasil mendapatkan data cuaca saat ini. ${Mood.SAD.emoji}`,
+                        mood: Mood.SAD
+                    };
+                }
+            } catch (error) {
+                logger.error({ event: 'weather_command_error', error: error.message, stack: error.stack }, "Error in /cuaca command handler");
+                Sentry.captureException(error);
+                return { text: `Maaf, Tuan. Terjadi kesalahan saat memproses perintah cuaca. ${Mood.SAD.emoji}`, mood: Mood.SAD };
             }
         }
     },
@@ -185,19 +229,20 @@ const commandHandlers = [
             const options = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false, timeZone: 'Asia/Jakarta' };
             const timeString = now.toLocaleTimeString('id-ID', options);
             return {
-                text: `Sekarang jam ${timeString}, ${USER_NAME}. ${currentMood.emoji}`,
+                text: `Sekarang jam ${timeString}, Tuan. ${currentMood.emoji}`,
                 mood: currentMood
             };
         }
     },
     {
         pattern: /(tanggal berapa|hari ini tanggal berapa)/i,
-        response: () => {
+        response: (chatId, msg) => {
+            const userName = msg.from.first_name;
             const now = new Date();
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'Asia/Jakarta' };
             const dateString = now.toLocaleDateString('id-ID', options);
             return {
-                text: `Hari ini ${dateString}, ${USER_NAME}. ${currentMood.emoji}`,
+                text: `Hari ini ${dateString}, ${userName}. ${currentMood.emoji}`,
                 mood: currentMood
             };
         }
@@ -218,64 +263,75 @@ const commandHandlers = [
     {
         pattern: /^\/reminder\s+(\S+)\s+(.+)/i,
         response: async (chatId, msg) => {
-            await LuminaTyping(chatId);
-            const [, timeString, message] = msg.text.match(/^\/reminder\s+(\S+)\s+(.+)/i);
-            const userName = msg.from.first_name || msg.from.username || 'Tuan';
-            const responseText = await commandHelper.setReminder(botInstanceRef, chatId, timeString, message, userName);
-            return { text: responseText, mood: Mood.NORMAL };
+             try {
+                await LuminaTyping(chatId);
+                const [, timeString, message] = msg.text.match(/^\/reminder\s+(\S+)\s+(.+)/i);
+                const userName = msg.from.first_name || msg.from.username || 'Tuan';
+                const responseText = await commandHelper.setReminder(botInstanceRef, chatId, timeString, message, userName);
+                return { text: responseText, mood: Mood.NORMAL };
+            } catch (error) {
+                logger.error({ event: 'reminder_command_error', error: error.message, stack: error.stack }, "Error in /reminder command handler");
+                Sentry.captureException(error);
+                return { text: 'Maaf, terjadi kesalahan saat menyetel pengingat.' };
+            }
         }
     },
     {
         pattern: /^\/note\s+(.+)/i,
         response: async (chatId, msg) => {
-            await LuminaTyping(chatId);
-            const [, noteMessage] = msg.text.match(/^\/note\s+(.+)/i);
-            const userId = msg.from.id;
-            const responseText = await commandHelper.addNote(userId, noteMessage);
-            return { text: responseText, mood: Mood.HAPPY };
+            try {
+                await LuminaTyping(chatId);
+                const [, noteMessage] = msg.text.match(/^\/note\s+(.+)/i);
+                const userId = msg.from.id;
+                const responseText = await commandHelper.addNote(userId, noteMessage);
+                return { text: responseText, mood: Mood.HAPPY };
+            } catch (error) {
+                logger.error({ event: 'note_command_error', error: error.message, stack: error.stack }, "Error in /note command handler");
+                Sentry.captureException(error);
+                return { text: 'Maaf, terjadi kesalahan saat menyimpan catatan.' };
+            }
         }
     },
     {
         pattern: /^\/shownotes/i,
         response: async (chatId, msg) => {
-            await LuminaTyping(chatId);
-            const userId = msg.from.id;
-            const responseText = await commandHelper.showNotes(userId);
-            return { text: responseText, mood: Mood.NORMAL };
+            try {
+                await LuminaTyping(chatId);
+                const userId = msg.from.id;
+                const responseText = await commandHelper.showNotes(userId);
+                return { text: responseText, mood: Mood.NORMAL };
+            } catch (error) {
+                logger.error({ event: 'shownotes_command_error', error: error.message, stack: error.stack }, "Error in /shownotes command handler");
+                Sentry.captureException(error);
+                return { text: 'Maaf, terjadi kesalahan saat menampilkan catatan.' };
+            }
         }
     },
     {
         pattern: /^\/search\s+(.+)$/i,
         response: async (chatId, msg) => {
             try {
-                // Ekstrak kueri pencarian dari pesan menggunakan pola RegEx
                 const match = msg.text.match(/^\/search\s+(.+)$/i);
                 if (!match || !match[1]) {
-                    // Seharusnya tidak terjadi jika pattern.test() sudah lolos, tapi sebagai pengaman
-                    sendMessage(chatId, `Maaf, Tuan ${msg.from.first_name || USER_NAME}. Format perintah /search tidak benar.`);
-                    return {}; // Kembalikan objek kosong atau sesuai struktur respons handler Tuan
+                    return { text: `Maaf, Tuan ${msg.from.first_name || ''}. Format perintah /search tidak benar.` };
                 }
-                const query = match[1].trim(); // match[1] berisi teks yang ditangkap oleh grup (.+)
-                const userNameForCommand = msg.from.first_name || USER_NAME;
-
-                if (query) {
-                    await LuminaTyping(chatId);
-                    sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Lumina akan mencari "${query}" dan mencoba merangkumnya untuk Anda... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
-
-
-                    const searchResultText = await commandHelper.performSearch(
-                        query,
-                        userNameForCommand,
-                        chatId,
-                        getAISummarizer()
-                    );
-                    return { text: searchResultText }; // Kembalikan teks untuk dikirim oleh loop handler utama
-                } else {
-                    return { text: `Tuan ${userNameForCommand}, mohon berikan kata kunci pencarian setelah perintah /search.` };
-                }
+                const query = match[1].trim();
+                const userNameForCommand = msg.from.first_name || '';
+                
+                await LuminaTyping(chatId);
+                sendMessage(chatId, `Baik, Tuan ${userNameForCommand}. Lumina akan mencari "${query}" dan mencoba merangkumnya... Ini mungkin butuh beberapa saat. ${getCurrentMood().emoji}`);
+                
+                const searchResultText = await commandHelper.performSearch(
+                    query,
+                    userNameForCommand,
+                    chatId,
+                    getAISummarizer()
+                );
+                return { text: searchResultText };
             } catch (error) {
-                console.error("Error di handler /search:", error);
-                return { text: `Maaf, Tuan ${msg.from.first_name || USER_NAME}. Terjadi kesalahan internal saat memproses perintah pencarian Anda.` };
+                logger.error({ event: 'search_command_error', query: msg.text, error: error.message, stack: error.stack }, "Error in /search command handler");
+                Sentry.captureException(error, { extra: { query: msg.text }});
+                return { text: `Maaf, Tuan ${msg.from.first_name || ''}. Terjadi kesalahan internal saat memproses perintah pencarian Anda.` };
             }
         }
     },
@@ -283,7 +339,7 @@ const commandHandlers = [
         pattern: /^\/help/i,
         response: async (chatId) => {
             await LuminaTyping(chatId);
-            const responseText = commandHelper.getHelpMessage();
+            const responseText = commandHelper.getHelpMessage(personalityMode); // Pass personality mode
             return { text: responseText, mood: Mood.NORMAL };
         }
     },
@@ -301,7 +357,7 @@ const commandHandlers = [
         response: async (chatId) => {
             await setPersonalityMode('TSUNDERE');
             return {
-                text: `Hmph, baiklah! Lumina akan kembali ke mode Tsundere. Jangan harap aku jadi manis, Idiot! 🔥`,
+                text: `Hmph, baiklah! Lumina akan kembali ke mode Tsundere. Jangan harap aku jadi manis, Baka! 櫨`,
                 mood: Mood.ANGRY 
             };
         }
@@ -311,7 +367,7 @@ const commandHandlers = [
         response: async (chatId) => {
             await setPersonalityMode('DEREDERE');
             return {
-                text: `Kyaa~! Oke, Tuan~ Lumina akan jadi manis dan ramah untukmu! 🌸`,
+                text: `Kyaa~! Oke, Tuan~ Lumina akan jadi manis dan ramah untukmu! 減`,
                 mood: Mood.LOVING 
             };
         }
@@ -322,22 +378,25 @@ if (config.calendarificApiKey) {
     commandHandlers.push({
         pattern: /^\/(hariini|liburhariini|infohari)$/i,
         response: async (chatId, msg) => {
-            await LuminaTyping(chatId);
-
-            const holidayMessage = await holidaysModule.getFormattedTodaysHolidays(
-                config.calendarificApiKey,
-                'ID',
-                config.USER_NAME // Mengambil USER_NAME dari config untuk personalisasi
-            );
-
-            return { text: holidayMessage };
+            try {
+                await LuminaTyping(chatId);
+                const holidayMessage = await holidaysModule.getFormattedTodaysHolidays(
+                    config.calendarificApiKey,
+                    'ID',
+                    config.USER_NAME
+                );
+                return { text: holidayMessage };
+            } catch (error) {
+                 logger.error({ event: 'holiday_command_error', error: error.message, stack: error.stack }, "Error in /hariini command handler");
+                 Sentry.captureException(error);
+                 return { text: 'Maaf, terjadi kesalahan saat memeriksa hari libur.' };
+            }
         }
     });
-    console.log('[Commands] Perintah /hariini untuk info hari libur telah diaktifkan.');
+    logger.info('[Commands] Perintah /hariini untuk info hari libur telah diaktifkan.');
 } else {
-    console.warn('[Commands] Calendarific API Key tidak ditemukan di config.js. Perintah /hariini (info hari libur) dinonaktifkan.');
+    logger.warn('[Commands] Calendarific API Key tidak ditemukan di config.js. Perintah /hariini (info hari libur) dinonaktifkan.');
 }
-
 
 /**
  * Mengatur instance bot Telegram. Ini harus dipanggil sekali saat inisialisasi.
