@@ -11,7 +11,6 @@ module.exports = {
     ocrSpaceApiKey: process.env.OCR_API_KEY,
     imaggaApiKey: process.env.IMAGGA_API_KEY,
     imaggaApiSecret: process.env.IMAGGA_API_SECRET,
-    USER_NAME: process.env.USER_NAME, 
     TARGET_CHAT_ID: process.env.TARGET_CHAT_ID,
     sentryDsn: process.env.DSN_KEY,
     weatherApiKey: process.env.WEATHER_API_KEY,
