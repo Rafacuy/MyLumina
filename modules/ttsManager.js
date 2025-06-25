@@ -71,7 +71,7 @@ const initTtsSchedules = (bot) => {
     // Voice Note untuk Waktu Sholat
     for (const [name, { hour, minute, emoji, file }] of Object.entries(PrayerTimes)) {
         schedule.scheduleJob({ rule: `${minute} ${hour} * * *`, tz: 'Asia/Jakarta' }, () => {
-            const caption = `${emoji} ${config.USER_NAME}, waktunya shalat ${name}, nih~ Jangan sampai terlewat! ${emoji}`;
+            const caption = `${emoji} Tuan, waktunya shalat ${name}, nih~ Jangan sampai terlewat! ${emoji}`;
             sendVoiceFromLocal(bot, chatId, VOICE_NOTE_FILES[file], caption);
         });
     }
