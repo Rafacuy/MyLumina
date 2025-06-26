@@ -1,9 +1,8 @@
 .env
-memory.db
-memory.ndjson.gz
+memory.json
 reminders.json
 notes.json
 relationState.json
-longTermMemory.json
 node_modules
 temp_images
+temp
