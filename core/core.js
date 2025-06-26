@@ -16,7 +16,7 @@
 // handles bot's internal state (like "mood" or "ngambek" mode), and interacts with various modules
 // for features like AI response generation, reminders, and long-term memory.
 // If you wish to use a different AI endpoint API, you might need to adjust the AI response generation
-// logic in 'ai-response.js' and potentially configuration in 'config/config.js'.
+// logic in 'ai-response.js' and configuration in 'config/config.js'.
 
 // ===== FILE IMPORTS =====
 
