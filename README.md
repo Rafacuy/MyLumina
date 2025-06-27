@@ -163,7 +163,6 @@ The following diagram explains the message processing flow from start to finish 
 ```mermaid
 mindmap
   root((MyLuminaBot))
-  
     Incoming Message
       Document Message
         Doc Handler
