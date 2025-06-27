@@ -1,4 +1,4 @@
-// data/memory.js (Refactored to use LokiJS)
+// data/memory.js 
 const fs = require("fs").promises;
 const path = require("path");
 const Loki = require("lokijs");
@@ -14,7 +14,7 @@ const MAX_HISTORY_LENGTH = 100; // Batas pesan dalam memori aktif
 const CLEANUP_INTERVAL = 7 * 24 * 60 * 60 * 1000; // Interval pembersihan otomatis: 1 minggu
 const LTM_CLEANUP_INTERVAL = 6 * 60 * 60 * 1000; // Interval pembersihan LTM: 6 jam
 
-// --- LokiJS Database Initialization ---
+// --- Database Initialization ---
 let db;
 let history; // Collection untuk history chat
 let preferences; // Collection untuk preferences (key-value)
@@ -154,7 +154,7 @@ const savePreference = async (key, value) => {
     } else {
       preferences.insert({ key: key, value: value });
     }
-    // console.log(`Preference saved: ${key} =`, value); // Bisa di-uncomment untuk debugging
+    // console.log(`Preference saved: ${key} =`, value); // Bisa diuncomment untuk debugging
   } catch (error) {
     console.error("Error saving preference:", error);
   }
@@ -244,9 +244,6 @@ const getLTMMemories = async () => {
  * Membersihkan LTM lama berdasarkan prioritas dan waktu pembuatan.
  */
 const cleanupOldLTMs = async () => {
-    // Fungsi ini tidak perlu banyak diubah karena logikanya bekerja pada data
-    // yang diambil dari getLTMMemories. Kita hanya memastikan getLTMMemories dan deletePreference
-    // bekerja dengan benar menggunakan LokiJS.
     console.log("Auto-cleanup LTM: Starting cleanup process...");
     try {
         const allLtm = await getLTMMemories();

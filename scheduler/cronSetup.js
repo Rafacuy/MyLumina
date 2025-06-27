@@ -6,7 +6,6 @@ const { getWeatherData, getWeatherString, getWeatherReminder } = require("../mod
 const Mood = require("../modules/mood"); 
 const { sendMessage } = require('../utils/sendMessage')
 const newsManager = require("../modules/newsManager");
-const recallMemory = require("../modules/recallMemory");
 const holidaysModule = require("../handler/holidayHandlers");
 const sendSadSongNotification = require("../utils/songNotifier");
 const relationState = require("../handler/relationHandler");
@@ -174,30 +173,6 @@ const setupCronJobs = (
             stack: error.stack,
           },
           "Kesalahan saat penjadwalan berita harian:"
-        );
-        Sentry.captureException(error);
-      }
-    }
-  );
-
-  // Fungsi ingat memori terjadwal setiap jam 9 pagi
-  schedule.scheduleJob(
-    { rule: "0 9 * * *", tz: "Asia/Jakarta" },
-    async () => {
-      logger.info(
-        { event: "recall_memory_scheduled" },
-        "[Core] Menjalankan fungsi ingat memori terjadwal..."
-      );
-      try {
-        await recallMemory.recallRandomMemory(configuredChatId);
-      } catch (error) {
-        logger.error(
-          {
-            event: "scheduled_recall_memory_error",
-            error: error.message,
-            stack: error.stack,
-          },
-          "Kesalahan saat penjadwalan ingat memori:"
         );
         Sentry.captureException(error);
       }

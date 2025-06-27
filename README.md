@@ -47,6 +47,157 @@
 
 * **Sentry Integration for Error Trace**: _Integrated with Sentry for robust error tracking and detailed error traces, ensuring quick identification and resolution of issues._
 
+---
+
+## 📁 Project Structure
+
+Here is an explanation of the main folder and file structure in the MyLumina project.
+
+```
+.
+├── MyLumina/
+├── assets/
+│   └── voice/
+│       └── (.ogg file)
+├── config/
+│   └── config.js
+├── core/
+│   ├── endpoints/
+│   │   ├── coreTA.js
+│   │   └── coreRouter.js
+│   ├── core.js
+│   └── ai-response.js
+├── data/
+│   └── memory.js
+├── handler/
+│   ├── commandHandler.js
+│   ├── contextHandler.js 
+│   ├── docHandler.js 
+│   ├── holidayHandlers.js 
+│   ├── relationHandler.js 
+│   └── visionHandler  
+├── modules/
+│   ├── chatSummarizer.js 
+│   ├── commandLists.js 
+│   ├── documentReader.js 
+│   ├── loveStateManager.js 
+│   ├── ltmProcessor.js 
+│   ├── mood.js 
+│   ├── newsManager.js 
+│   ├── ttsManager 
+│   └── weather.js 
+├── scheduler/  
+│   ├── cronSetup.js 
+│   └── updateTimeModes.js
+├── state/
+│   └── globalState.js
+├── /utils/
+│   ├── cacheHelper.js 
+│   ├── chatFormatter.js 
+│   ├── logger.js 
+│   ├── sendMessage.js 
+│   ├── songNotifier.js 
+│   ├── telegramHelper 
+│   └── timeHelper.js    
+├── .env 
+├── .gitignore 
+├── index.js 
+├── LICENSE
+├── package-lock.json
+├── package.json
+└── README.md    
+```
+
+- **`./` (Root)**
+- `index.js`: The main entry point for running the bot application.
+- `.env`: Stores all API keys, bot tokens, and other sensitive environment variables.
+
+- **`/assets`**: Stores static assets.
+- `/voice`: Contains audio files (such as `.ogg`) used by `ttsManager` to send voice reminders or other notifications.
+
+- **`/config`**: Contains configuration files.
+
+- `config.js`: Bridge for loading and providing variables from `.env` files to the rest of the application.
+
+- **`/core`**: Core directory that is the heart of the bot logic.
+- `core.js`: The bot's main orchestrator. This file handles incoming messages, routes them to the appropriate *handlers* (document, image, text), manages the bot's internal state (such as *sulky* mode), and initializes all components.
+- `ai-response.js`: Responsible for constructing *prompts* and generating responses from the AI ​​model (Groq), taking into account context, mood, and other data.
+- `/endpoints`: Contains specific implementations for interacting with various AI API providers (e.g., TogetherAI, OpenRouter).
+
+- **`/data`**: Manages data persistence.
+- `memory.js`: Module for short-term and long-term memory management using LokiJS. Stores chat history, user preferences, and other state.
+
+- **`/handler`**: Contains modules that handle specific types of input or logic.
+- `commandHandler.js`: Handles text-based commands (e.g., `/help`, `/status`) and regex pattern-based auto-replies.
+- `contextHandler.js`: Analyzes incoming messages to detect the topic or context of the conversation.
+- `docHandler.js`: Processes document files sent by users.
+- `relationHandler.js`: Manages the relationship and affection system between the bot and the user.
+- `visionHandler.js`: Handles requests involving image analysis (AI Vision).
+
+- **`/modules`**: Functional components that provide specific features for the bot.
+- `ltmProcessor.js`: Performs automatic detection of text messages to save user preferences to long-term memory (LTM).
+- `mood.js`: Contains the definition of the *mood* objects and states that the bot can have (e.g., Happy, Sad, Jealous).
+- `ttsManager.js`: Manages Text-to-Speech (TTS) functionality, mainly for scheduling reminders.
+- *Other modules such as `weather.js`, `newsManager.js`, `loveStateManager.js`, etc.*
+
+- **`/scheduler`**: Handles scheduled tasks.
+- `cronSetup.js`: Sets up and initializes all *cron jobs* for background tasks (e.g., check status, send daily reminders).
+- `updateTimeModes.js`: Module for updating the bot's state or *mood* based on time (e.g., say good morning, change personality at night).
+
+- **`/state`**: Manages the global state of the application.
+
+- `globalState.js`: Stores global state variables that can be accessed across modules, such as *sulky* status, last interaction timestamp, etc.
+
+- **`/utils`**: A collection of helper functions (utilities) used in various parts of the application.
+- `logger.js`: Structured logging utilities using Pino.
+- `sendMessage.js`: Centralized function for sending messages back to the user via the Telegram API.
+- `timeHelper.js`: Helper functions for handling time zones (Asia/Jakarta).
+- `cacheHelper.js`, `chatFormatter.js`, `telegramHelper.js`, etc.
+
+---
+
+## Bot Workflow (Mind Map)
+
+The following diagram explains the message processing flow from start to finish inside MyLumina.
+
+```mermaid
+mindmap
+  root((MyLuminaBot))
+  
+    Incoming Message
+      Document Message
+        Doc Handler
+        Extract Text and Analyze
+      Image Message
+        Vision Handler
+        Analyze Image with AI Vision
+        Generate AI Response from Image
+      Filter Message
+        If Empty, Emoji or Number
+        Ignore Message
+      Standard Text Message
+        Update Interaction Status
+        Add Relationship Points
+        Analyze and Save to Long Term Memory
+        Analyze Message Context
+          Auto Reply Detected
+            Send Auto Reply
+          Command Detected
+            Execute Command Handler
+          No Command or Auto Reply
+            Generate AI Response
+            Send Response to User
+    Background Processes
+      ::icon(fa fa-clock)
+      Check Ngambek Status
+      Update Time-based Modes
+      Reschedule Reminders
+      Send Daily News and Announcements
+```
+
+---
+
+
 ## 🚀 Getting Started
 ### Prerequisites
 * **Node.js (>= 18)**
@@ -135,6 +286,8 @@ DSN_KEY=YOUR_DSN_KEY                               # Your DSN Key for Sentry
 
 * You can modify the Text-to-Speech (TTS) voices in the [assets](assets/voice) directory.
 
+---
+
 ## Usage
 Once the bot is running, you can interact with Lumina in your Telegram chat.
 
@@ -143,9 +296,9 @@ Once the bot is running, you can interact with Lumina in your Telegram chat.
 npm start
 ```
 
-##### **General Chat**: Send any message to Lumina, and she will respond based on her AI model, personality, and current mood.
+### **General Chat**: Send any message to Lumina, and she will respond based on her AI model, personality, and current mood.
 
-##### **Predefined Commands**: Lumina has specific responses for certain phrases and commands:
+### **Predefined Commands**: Lumina has specific responses for certain phrases and commands:
 
 * `hai, halo, bot, helo, haii, woy, hoy`: Lumina will greet you happily.
 
@@ -169,7 +322,7 @@ npm start
 
 * `/author`: Information about the creator of Lumina.
 
-##### **Scheduled Messages**: If `TARGET_CHAT_ID` is configured, Lumina will automatically send:
+### **Scheduled Messages**: If `TARGET_CHAT_ID` is configured, Lumina will automatically send:
 
 * Daily prayer time reminders for Subuh, Dzuhur, Ashar, Maghrib, and Isya (Asia/Jakarta timezone).
 
