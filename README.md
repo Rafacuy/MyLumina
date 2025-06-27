@@ -161,37 +161,44 @@ Here is an explanation of the main folder and file structure in the MyLumina pro
 The following diagram explains the message processing flow from start to finish inside MyLumina.
 
 ```mermaid
-mindmap
-  root((MyLuminaBot))
-    Incoming Message
-      Document Message
-        Doc Handler
-        Extract Text and Analyze
-      Image Message
-        Vision Handler
-        Analyze Image with AI Vision
-        Generate AI Response from Image
-      Filter Message
-        If Empty, Emoji or Number
-        Ignore Message
-      Standard Text Message
-        Update Interaction Status
-        Add Relationship Points
-        Analyze and Save to Long Term Memory
-        Analyze Message Context
-          Auto Reply Detected
-            Send Auto Reply
-          Command Detected
-            Execute Command Handler
-          No Command or Auto Reply
-            Generate AI Response
-            Send Response to User
-    Background Processes
-      ::icon(fa fa-clock)
-      Check Ngambek Status
-      Update Time-based Modes
-      Reschedule Reminders
-      Send Daily News and Announcements
+graph TD
+    A((MyLuminaBot)) --> B[Incoming Message]
+
+    B --> C{Document Message}
+    C --> D[Doc Handler]
+    D --> E[Extract Text and Analyze]
+    E --> Z[Generate Summary from Documents]
+
+    B --> F{Image Message}
+    F --> G[Vision Handler]
+    G --> H[Analyze Image with AI Vision]
+    H --> I[Generate AI Response from Image]
+
+    B --> J{Filter Message}
+    J --> K{If Empty, Emoji or Number}
+    K --> L[Ignore Message]
+
+    B --> M{Standard Text Message}
+    M --> N[Update Interaction Status]
+    M --> O[Add Relationship Points]
+    M --> P[Analyze and Save to Long Term Memory]
+    M --> Q[Analyze Message Context]
+
+    Q --> R{Auto Reply Detected}
+    R --> S[Send Auto Reply]
+
+    Q --> T{Command Detected}
+    T --> U[Execute Command Handler]
+
+    Q --> V{No Command or Auto Reply}
+    V --> W[Generate AI Response]
+    W --> X[Send Response to User]
+
+    AA[Background Processes]
+    AA --> BB[Check Ngambek Status]
+    AA --> CC[Update Time-based Modes]
+    AA --> DD[Reschedule Reminders]
+    AA --> EE[Send Daily News and Announcements]
 ```
 
 ---
