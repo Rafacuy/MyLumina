@@ -44,8 +44,8 @@ const logger = require("../utils/logger"); // Logging utility based on the Pino 
 const { manageCache } = require("../utils/cacheHelper"); // Utility module for cache management functions.
 
 // Scheduler Imports
-const { setupCronJobs } = require("../schedules/cronSetup"); // Configures and sets up scheduled tasks (cron jobs) for the bot.
-const updateTimeBasedModes = require("../schedules/updateTimeModes"); // Module for updating bot's internal states like mood or time-based modes.
+const { setupCronJobs } = require("../scheduler/cronSetup"); // Configures and sets up scheduled tasks (cron jobs) for the bot.
+const updateTimeBasedModes = require("../scheduler/updateTimeModes"); // Module for updating bot's internal states like mood or time-based modes.
 
 // State Import
 const globalState = require("../state/globalState"); // Manages global state variables accessible across different modules.
