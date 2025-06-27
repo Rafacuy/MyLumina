@@ -160,46 +160,7 @@ Here is an explanation of the main folder and file structure in the MyLumina pro
 
 The following diagram explains the message processing flow from start to finish inside MyLumina.
 
-```mermaid
-graph TD
-    A((MyLuminaBot)) --> B[Incoming Message]
-
-    B --> C{Document Message}
-    C --> D[Doc Handler]
-    D --> E[Extract Text and Analyze]
-    E --> Z[Generate Summary from Documents]
-
-    B --> F{Image Message}
-    F --> G[Vision Handler]
-    G --> H[Analyze Image with AI Vision]
-    H --> I[Generate AI Response from Image]
-
-    B --> J{Filter Message}
-    J --> K{If Empty, Emoji or Number}
-    K --> L[Ignore Message]
-
-    B --> M{Standard Text Message}
-    M --> N[Update Interaction Status]
-    M --> O[Add Relationship Points]
-    M --> P[Analyze and Save to Long Term Memory]
-    M --> Q[Analyze Message Context]
-
-    Q --> R{Auto Reply Detected}
-    R --> S[Send Auto Reply]
-
-    Q --> T{Command Detected}
-    T --> U[Execute Command Handler]
-
-    Q --> V{No Command or Auto Reply}
-    V --> W[Generate AI Response]
-    W --> X[Send Response to User]
-
-    AA[Background Processes]
-    AA --> BB[Check Ngambek Status]
-    AA --> CC[Update Time-based Modes]
-    AA --> DD[Reschedule Reminders]
-    AA --> EE[Send Daily News and Announcements]
-```
+![Mindmap-MyLumina](./docs/img/Editor%20_%20Mermaid%20Chart-2025-06-27-131113.png)
 
 ---
 
