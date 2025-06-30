@@ -30,8 +30,9 @@ async function ensureTempDir() {
  * Menangani pesan masuk yang berisi dokumen.
  * @param {object} msg - Objek pesan dari node-telegram-bot-api.
  * @param {object} bot - Instance bot Telegram.
+ * @param {object} aiDependencies - Objek yang berisi dependensi AI dari core.js.
  */
-async function handleDocument(msg, bot) {
+async function handleDocument(msg, bot, aiDependencies) {
     const chatId = msg.chat.id;
     const doc = msg.document;
 
@@ -75,12 +76,12 @@ async function handleDocument(msg, bot) {
 
         logger.info({ event: 'file_download_success', path: tempFilePath }, 'File downloaded successfully.');
 
-        // Proses dan rangkum dokumen
-        const summary = await documentReader.summarizeDocument(tempFilePath);
+        // Proses dan rangkum dokumen, teruskan dependensi AI
+        const summary = await documentReader.summarizeDocument(tempFilePath, msg, aiDependencies);
 
         // Kirim hasil rangkuman
-        const finalMessage = `✨ **Rangkuman Dokumen: ${doc.file_name}** ✨\n\n${summary}`;
-        await sendMessage(chatId, finalMessage, { parse_mode: 'Markdown' });
+        // Rangkuman sudah dalam format respons dari AI, jadi kita bisa kirim langsung
+        await sendMessage(chatId, summary);
 
     } catch (error) {
         logger.error({ event: 'document_handling_error', error: error.message, stack: error.stack }, 'Failed to handle document.');

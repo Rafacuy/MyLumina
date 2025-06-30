@@ -2,62 +2,24 @@
 
 const fs = require('fs').promises;
 const path = require('path');
-const Groq = require('groq-sdk');
 const Sentry = require('@sentry/node');
 const pdf = require('pdf-parse');
 const mammoth = require('mammoth');
 
-const logger = require('../utils/logger'); 
-const config = require('../config/config');
-
-// Inisialisasi Groq Client
-const groq = new Groq({ apiKey: config.groqApiKey });
+const logger = require('../utils/logger');
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_TEXT_LENGTH = 15000; // Batas karakter untuk dikirim ke AI, mencegah token limit
 const SUSPICIOUS_EXTENSIONS = ['.exe', '.bat', '.sh', '.js', '.py', '.msi', '.dll', '.vbs'];
 
 /**
- * Merangkum teks menggunakan Groq AI.
- * @param {string} text - Teks yang akan diringkas.
- * @returns {Promise<string>} - Rangkuman dari AI.
- */
-async function summarizeWithAI(text) {
-    logger.info({ event: 'summarization_start' }, 'Sending text to Groq for summarization.');
-    try {
-        const chatCompletion = await groq.chat.completions.create({
-            messages: [
-                {
-                    role: 'system',
-                    content: 'Anda adalah asisten AI yang ahli dalam merangkum dokumen. Tugas Anda adalah membaca teks yang diberikan dan membuat rangkuman yang jelas, ringkas, dan mudah dipahami dalam format poin-poin utama (bullet points) dalam Bahasa Indonesia. Fokus pada ide-ide kunci dan informasi terpenting.'
-                },
-                {
-                    role: 'user',
-                    content: `Berikut adalah teks dari sebuah dokumen. Tolong buatkan rangkumannya:\n\n---\n\n${text}`
-                }
-            ],
-            model: 'llama-3.1-8b-instant', 
-            temperature: 0.5,
-            max_tokens: 1024,
-        });
-
-        const summary = chatCompletion.choices[0]?.message?.content || 'Tidak dapat menghasilkan rangkuman.';
-        logger.info({ event: 'summarization_success' }, 'Successfully received summary from Groq.');
-        return summary;
-
-    } catch (error) {
-        logger.error({ event: 'summarization_error', error: error.message, stack: error.stack }, 'Error during summarization with Groq.');
-        Sentry.captureException(error);
-        throw new Error('Gagal saat berkomunikasi dengan AI untuk merangkum teks.');
-    }
-}
-
-/**
- * Membaca file, mengekstrak teksnya, dan mengembalikannya untuk dirangkum.
+ * Membaca file, mengekstrak teksnya, dan mengembalikannya untuk dirangkum menggunakan generateAIResponse.
  * @param {string} filePath - Path menuju file yang akan diproses.
- * @returns {Promise<string>} Rangkuman dokumen.
+ * @param {object} msg - Objek pesan asli dari Telegram untuk konteks.
+ * @param {object} aiDependencies - Objek berisi { generateAIResponse, USER_NAME, Mood }.
+ * @returns {Promise<string>} Rangkuman dokumen yang dihasilkan oleh AI.
  */
-async function summarizeDocument(filePath) {
+async function summarizeDocument(filePath, msg, aiDependencies) {
     try {
         const stats = await fs.stat(filePath);
         const fileExt = path.extname(filePath).toLowerCase();
@@ -86,7 +48,7 @@ async function summarizeDocument(filePath) {
                 break;
             case '.txt':
             case '.csv':
-            case '.md': 
+            case '.md':
                 text = await fs.readFile(filePath, 'utf-8');
                 break;
             default:
@@ -102,8 +64,26 @@ async function summarizeDocument(filePath) {
             logger.warn({ event: 'text_truncated', original: text.length, new: processedText.length }, 'Text truncated due to length limit.');
         }
 
-        // Kirim ke AI untuk dirangkum
-        const summary = await summarizeWithAI(processedText);
+        // Dapatkan fungsi dan data yang diperlukan dari dependensi
+        const { generateAIResponse, USER_NAME, Mood } = aiDependencies;
+
+        // Buat prompt khusus untuk tugas merangkum, yang akan menjadi input 'user' untuk generateAIResponse.
+        // Prompt ini menginstruksikan AI untuk bertindak sebagai Lumina tetapi dengan tugas khusus.
+        // Prompt sistem dari generateAIResponse akan tetap menangani kepribadiannya.
+        const summaryUserPrompt = `Aku butuh bantuanmu untuk merangkum dokumen. Tolong baca teks di bawah ini dan buatkan rangkuman yang jelas dalam format poin-poin (bullet points). Pastikan kamu tetap menjadi Lumina saat menjawab ya.\n\nBerikut teksnya:\n\n---\n\n${processedText}`;
+
+        logger.info({ event: 'summarization_start_with_ai_response' }, 'Sending document text to generateAIResponse for summarization.');
+
+        // Panggil generateAIResponse dengan argumen yang sesuai
+        const summary = await generateAIResponse(
+            summaryUserPrompt,
+            msg.chat.id,
+            { topic: 'document_summary' }, // messageContext
+            USER_NAME,
+            Mood
+        );
+
+        logger.info({ event: 'summarization_success_with_ai_response' }, 'Successfully received summary via generateAIResponse.');
         return summary;
 
     } catch (error) {
