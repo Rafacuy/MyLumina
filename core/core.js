@@ -314,7 +314,14 @@ const setupMessageListener = (bot) => {
     if (document) {
       try {
         await updateInteractionStatus(); // Log this as an interaction.
-        await docHandler.handleDocument(msg, bot); // Delegate document handling to docHandler.
+        
+        const aiDependencies = {
+          generateAIResponse,
+          USER_NAME: getUserName(msg),
+          Mood: commandHandlers.Mood,
+        };
+
+        await docHandler.handleDocument(msg, bot, aiDependencies); // Teruskan dependensi
       } catch (error) {
         logger.error(
           { event: "document_core_handler_error", error: error.message },

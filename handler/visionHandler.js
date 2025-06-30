@@ -213,7 +213,6 @@ const scheduleFileDeletion = (filePath, delayMs = 30 * 60 * 1000) => {
  */
 const handleVisionRequest = async (fileUrl, chatId) => {
     await LuminaTyping(chatId);
-    await sendMessage(chatId, "Hmph, Tuan mengirimkan gambar ya? Baik, Lumina akan menganalisisnya. Tunggu sebentar!");
 
     const originalFileName = `${Date.now()}_original.jpg`;
     const compressedFileName = `${Date.now()}_compressed.jpg`;
