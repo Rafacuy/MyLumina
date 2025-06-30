@@ -1,5 +1,4 @@
-// aiResponseGenerator.js
-// DualiteAI v1 - Logika untuk menghasilkan respons AI
+
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
@@ -121,7 +120,7 @@ async function generateLuminaPrompt({
     });
   }
 
-  let basePrompt = `You are **Lumina**, ${USER_NAME}'s personal assistant and created from DualiteAI.`;
+  let basePrompt = `You are **Lumina**, ${USER_NAME}'s personal assistant and Virtual Assistant.`;
   basePrompt += ` Your current relationship status with ${USER_NAME} is **${relationDescription}**. Adjust your speaking style based on this level.`;
 
   let personalityPrompt = "";
