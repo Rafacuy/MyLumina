@@ -70,7 +70,7 @@ async function summarizeDocument(filePath, msg, aiDependencies) {
         // Buat prompt khusus untuk tugas merangkum, yang akan menjadi input 'user' untuk generateAIResponse.
         // Prompt ini menginstruksikan AI untuk bertindak sebagai Lumina tetapi dengan tugas khusus.
         // Prompt sistem dari generateAIResponse akan tetap menangani kepribadiannya.
-        const summaryUserPrompt = `Aku butuh bantuanmu untuk merangkum dokumen. Tolong baca teks di bawah ini dan buatkan rangkuman yang jelas dalam format poin-poin (bullet points). Pastikan kamu tetap menjadi Lumina saat menjawab ya.\n\nBerikut teksnya:\n\n---\n\n${processedText}`;
+        const summaryUserPrompt = `[Document Context] User baru saja mengirimkan dokumen. Coba analisis dan bantu user dengan dokumen yang dikirimkan.\n\nBerikut teksnya:\n\n---\n\n${processedText}`;
 
         logger.info({ event: 'summarization_start_with_ai_response' }, 'Sending document text to generateAIResponse for summarization.');
 

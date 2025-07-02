@@ -7,11 +7,8 @@
 // TIME FORMAT: Asia/Jakarta - All time-based operations use Jakarta timezone.
 // MIT License
 
-// -------- Groq EDITION -----------
-// This is an original file designed to interact with AI endpoints, specifically tailored for Groq.
-
 // Notes:
-// This file serves as the main entry point and message handling orchestrator for the MyLumina bot.
+// This file serves as the main logics and message handling orchestrator for the MyLumina bot.
 // It manages incoming messages, dispatches them to appropriate handlers (e.g., document, image, text),
 // handles bot's internal state (like "mood" or "ngambek" mode), and interacts with various modules
 // for features like AI response generation, reminders, and long-term memory.
