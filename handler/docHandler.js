@@ -1,4 +1,7 @@
 // handler/docHandler.js
+// Handles incoming document messages from Telegram. It downloads the file,
+// processes it using a document reader module, and sends back a summary.
+ 
 
 const fs = require('fs').promises;
 const path = require('path');
@@ -10,11 +13,14 @@ const { sendMessage } = require('../utils/sendMessage');
 const documentReader = require('../modules/documentReader');
 const logger = require('../utils/logger');
 
+// --- Constants ---
 const TEMP_DIR = path.join(__dirname, '..', 'temp');
-const MAX_FILE_SIZE_TELEGRAM = 5 * 1024 * 1024; // 5 MB, batas awal sebelum download
+const MAX_FILE_SIZE_TELEGRAM = 5 * 1024 * 1024; // 5 MB, initial limit before download.
 
 /**
- * Memastikan direktori sementara ada.
+ * Ensures that the temporary directory for storing downloaded files exists.
+ * Creates the directory if it doesn't already exist.
+ * @throws {Error} If the directory cannot be created.
  */
 async function ensureTempDir() {
     try {
@@ -22,29 +28,32 @@ async function ensureTempDir() {
     } catch (error) {
         logger.error({ event: 'temp_dir_creation_error', error: error.message }, 'Failed to create temp directory.');
         Sentry.captureException(error);
+        // Propagate the error to be caught by the main handler.
         throw new Error('Could not create temporary directory for file processing.');
     }
 }
 
 /**
- * Menangani pesan masuk yang berisi dokumen.
- * @param {object} msg - Objek pesan dari node-telegram-bot-api.
- * @param {object} bot - Instance bot Telegram.
- * @param {object} aiDependencies - Objek yang berisi dependensi AI dari core.js.
+ * Handles an incoming message containing a document.
+ * @param {object} msg - The message object from node-telegram-bot-api.
+ * @param {object} bot - The Telegram bot instance.
+ * @param {object} aiDependencies - An object containing AI dependencies from core.js, passed to the document reader.
  */
 async function handleDocument(msg, bot, aiDependencies) {
     const chatId = msg.chat.id;
     const doc = msg.document;
 
+    // Guard clause: exit if the message is not a document.
     if (!doc) {
-        return; // Bukan pesan dokumen
+        return;
     }
     
     logger.info({ event: 'document_received', chatId, file_id: doc.file_id, file_name: doc.file_name }, 'Document message received.');
 
-    // Validasi awal ukuran file sebelum download
+    // Initial validation of file size before attempting to download.
+    // This prevents wasting bandwidth on files that are too large.
     if (doc.file_size > MAX_FILE_SIZE_TELEGRAM) {
-        sendMessage(chatId, 'Maaf, ukuran file terlalu besar. Ukuran maksimal yang diizinkan adalah 5MB.');
+        sendMessage(chatId, 'Buset, Ukuran file-nya terlalu besar, aku tidak bisa menganalisisnya. Maksimum 5MB ukuran dokumen.');
         logger.warn({ event: 'file_size_exceeded', size: doc.file_size }, 'File size validation failed before download.');
         return;
     }
@@ -53,13 +62,15 @@ async function handleDocument(msg, bot, aiDependencies) {
     
     try {
         await ensureTempDir();
-        await sendMessage(chatId, `Membaca file "${doc.file_name}"... Mohon tunggu sebentar ya, Tuan.`);
+        await sendMessage(chatId, `Reading file "${doc.file_name}"... Please wait a moment, Master.`);
 
-        // Download file
+        // --- File Download ---
         const fileLink = await bot.getFileLink(doc.file_id);
+        // Generate a random file name to avoid naming conflicts.
         const randomFileName = `${crypto.randomBytes(16).toString('hex')}${path.extname(doc.file_name || '.tmp')}`;
         tempFilePath = path.join(TEMP_DIR, randomFileName);
 
+        // Logic: Use streams for downloading to handle files efficiently without loading them all into memory.
         const response = await axios({
             url: fileLink,
             method: 'GET',
@@ -69,34 +80,38 @@ async function handleDocument(msg, bot, aiDependencies) {
         const writer = require('fs').createWriteStream(tempFilePath);
         response.data.pipe(writer);
 
+        // Wait for the stream to finish writing the file to disk.
         await new Promise((resolve, reject) => {
             writer.on('finish', resolve);
-            writer.on('error', reject);
+            writer.on('error', reject); // Handle potential writing errors.
         });
 
         logger.info({ event: 'file_download_success', path: tempFilePath }, 'File downloaded successfully.');
 
-        // Proses dan rangkum dokumen, teruskan dependensi AI
+        // --- Document Processing ---
+        // Pass the file path and AI dependencies to the summarizer module.
+        // This keeps the document handling logic separate from the processing logic.
         const summary = await documentReader.summarizeDocument(tempFilePath, msg, aiDependencies);
 
-        // Kirim hasil rangkuman
-        // Rangkuman sudah dalam format respons dari AI, jadi kita bisa kirim langsung
+        // Send the summary result back to the user.
         await sendMessage(chatId, summary);
 
     } catch (error) {
         logger.error({ event: 'document_handling_error', error: error.message, stack: error.stack }, 'Failed to handle document.');
         Sentry.captureException(error);
         
-        let userMessage = 'Maaf Tuan, terjadi kesalahan saat memproses dokumen Anda.';
+        // Provide a user-friendly error message based on the error type.
+        let userMessage = 'Oops, Ada kesalahan saat menganalisis dokumen. Mohon coba lagi nanti.';
         if (error.message.includes('Unsupported file type')) {
-            userMessage = `Maaf, format file "${path.extname(doc.file_name)}" tidak didukung saat ini.`;
+            userMessage = `Hmm.. Format file"${path.extname(doc.file_name)}" masih belum didukung.`;
         } else if (error.message.includes('exceeds the 5MB limit')) {
-            userMessage = 'Maaf, ukuran file melebihi batas 5MB.';
+            userMessage = 'Maaf, batas size dokumen hanya 5MB.';
         }
 
         await sendMessage(chatId, userMessage);
     }
-    // File deletion sudah dihandle di dalam documentReader via `finally` block
+    // Note: The deletion of the temporary file is handled within the `documentReader` module,
+    // likely in a `finally` block to ensure cleanup even if an error occurs. This is good practice.
 }
 
 module.exports = { handleDocument };
