@@ -1,16 +1,16 @@
-// index.js (Diubah ke Mode Polling)
+// index.js 
+// Entry-point for this project.
 
-require("dotenv").config();
-const TelegramBot = require("node-telegram-bot-api");
-const express = require("express");
-const memory = require("./data/memory");
-const config = require("./config/config");
-const { initLuminabot } = require("./core/core");
-const command = require("./handler/commandHandlers");
-const Sentry = require("@sentry/node");
-const logger = require("./utils/logger");
+require("dotenv").config(); // Dotenv import for config.js
+const TelegramBot = require("node-telegram-bot-api"); // Telegram Bot API Library 
+const express = require("express"); // Express.js import for keep-alive functions
+const memory = require("./data/memory"); // Contains persistent-data memory for Lumina
+const config = require("./config/config"); // Contains API Key, Token, etc secured with dotenv
+const { initLuminabot } = require("./core/core"); // Core module for LuminaBot
+const Sentry = require("@sentry/node"); // Sentry for error trace
+const logger = require("./utils/logger"); // Logger utility based on pino lubrary for structured logging
 
-// Inisialisasi Sentry jika ada DSN
+// Sentry Initialization
 if (config.sentryDsn) {
   Sentry.init({
     dsn: config.sentryDsn,
@@ -19,17 +19,17 @@ if (config.sentryDsn) {
   logger.info("[Sentry] Sentry is initialized.");
 }
 
-// Inisialisasi Express app
+// Express app initialization
 const app = express();
 
-// Rute dasar untuk keep-alive
+// Basic route for keep-alive system
 app.get("/", (req, res) => {
   res.send("Bot is alive and polling!");
 });
 
 const bot = new TelegramBot(config.telegramBotToken, { polling: true });
 
-// Memberi tahu bot tentang kesalahan polling agar tidak crash
+// Notify the bot about polling errors to prevent it from crashing.
 bot.on("polling_error", (error) => {
     logger.error(
       {
@@ -42,25 +42,25 @@ bot.on("polling_error", (error) => {
     Sentry.captureException(error);
 });
 
-// Inisialisasi logika utama bot
+// Initialize core logics for the bot
 initLuminabot(bot);
 
 
-// Mulai server Express untuk endpoint keep-alive
+// Start a Express server for keep-alive system endpoint
 app.listen(config.PORT, () => {
   logger.info(`[Server] Keep-alive server running on port ${config.PORT}`);
 });
 
-// Tangani penutupan aplikasi dengan benar
+// Handle application closing properly
 const gracefulShutdown = async (signal) => {
   logger.info(`${signal} received. Shutting down gracefully...`);
   try {
-    // Hentikan polling bot
+    // Stops bot polling procedure
     if (bot.isPolling()) {
       await bot.stopPolling();
       logger.info("[Bot] Polling stopped.");
     }
-    // Tutup koneksi database
+    // Close connection database
     await memory.closeDb();
     logger.info("[DB] Database connection closed.");
     process.exit(0);
