@@ -1,16 +1,10 @@
+// DESCRIPTION: This file contains functions to handle AI responses and prompting for Lumina.
 
-// AUTHOR: Arash
-// TIKTOK: @rafardhancuy
-// Github: https://github.com/Rafacuy
-// LANGUAGE: ID (Indonesia)
-// TIME FORMAT: Asia/jakarta
-// MIT License
-
-// IMPORTS 
+// IMPORTS
 const Groq = require("groq-sdk");
 const Sentry = require("@sentry/node");
 
-// Variabel-variabel ini akan DIINJEK dari core.js untuk menghindari circular dependency
+// These variables will be INJECTED from core.js to avoid circular dependency
 let config = {};
 let memory = {};
 let contextManager = {};
@@ -26,9 +20,9 @@ let ltmProcessor = {};
 let visionHandler = {};
 let logger = {};
 let globalState = {};
-let sendMessageFunction = null; // Fungsi sendMessage dari utils/sendMessage
+let sendMessageFunction = null; // sendMessage function from utils/sendMessage
 
-// Fungsi inisialisasi untuk menyuntikkan dependensi
+// Initialization function to inject dependencies
 const initialize = (dependencies) => {
   ({
     config,
@@ -46,39 +40,38 @@ const initialize = (dependencies) => {
     visionHandler,
     logger,
     globalState,
-    sendMessageFunction // Menerima sendMessage
+    sendMessageFunction, // Receive sendMessage
   } = dependencies);
 
-  // Inisialisasi GROQ client setelah config disuntikkan
+  // Initialize GROQ client after config is injected
   client = new Groq({ apiKey: config.groqApiKey });
+
 };
 
+const CONVERSATION_HISTORY_LIMIT = 4; // Limit the number of recent messages sent to the AI ​​for the AI ​​context
+const RATE_LIMIT_WINDOW_MS = 20 * 1000; // Rate limiting window: 20 seconds
+const RATE_LIMIT_MAX_REQUESTS = 3; // Maximum requests allowed in the rate limiting window per user
+const SLEEP_START_HOUR = 0; // Lumina sleep time (00:00 - midnight)
+const SLEEP_END_HOUR = 4; // Lumina sleep end time (04:00 - 4am)
 
-const CONVERSATION_HISTORY_LIMIT = 4; // Batasi jumlah pesan terbaru yang dikirim ke AI untuk konteks AI
-const RATE_LIMIT_WINDOW_MS = 20 * 1000; // Window pembatasan laju: 20 detik
-const RATE_LIMIT_MAX_REQUESTS = 3; // Maksimal permintaan yang diizinkan dalam window pembatasan laju per pengguna
-const SLEEP_START_HOUR = 0; // Waktu tidur Lumina (00:00 - tengah malam)
-const SLEEP_END_HOUR = 4; // Waktu berakhir tidur Lumina (04:00 - 4 pagi)
-
-
-let client; // Akan diinisialisasi setelah config tersedia
+let client; // Will be initialized once config is available
 
 /**
- * Menghasilkan prompt sistem untuk AI berdasarkan mode, mood, dan konteks saat ini,
- * termasuk informasi dari memori jangka panjang.
- * @param {object} params - Objek yang berisi semua parameter yang diperlukan.
- * @param {string} params.USER_NAME - Nama pengguna yang berinteraksi dengan Lumina.
- * @param {string} params.currentPersonality - Kepribadian Lumina saat ini (TSUNDERE/DEREDERE).
- * @param {boolean} params.isDeeptalkMode - True jika dalam mode deeptalk.
- * @param {object} params.currentMood - Objek mood saat ini.
- * @param {string|null} params.imageContext - Deskripsi gambar dari VisionAgent.
- * @param {string|null} params.currentTopic - Topik percakapan saat ini.
- * @param {string|null} params.currentChatSummary - Ringkasan obrolan sebelumnya.
- * @param {object} params.longTermMemory - Objek memori jangka panjang (sudah dimuat).
- * @param {boolean} params.isNgambekMode - True jika Lumina dalam mode 'Ngambek'.
- * @param {boolean} params.isRomanceMode - True jika dalam mode romansa.
- * @param {string} params.botName - Nama bot.
- * @returns {string} String prompt sistem.
+ * Generates system prompts for the AI ​​based on the current mode, mood, and context,
+ * including information from long-term memory.
+ * @param {object} params - An object containing all required parameters.
+ * @param {string} params.USER_NAME - The name of the user interacting with Lumina.
+ * @param {string} params.currentPersonality - Lumina's current personality (TSUNDERE/DEREDERE).
+ * @param {boolean} params.isDeeptalkMode - True if in deeptalk mode.
+ * @param {object} params.currentMood - The current mood object.
+ * @param {string|null} params.imageContext - The image description from the VisionAgent.
+ * @param {string|null} params.currentTopic - The current conversation topic.
+ * @param {string|null} params.currentChatSummary - Summary of the previous chat.
+ * @param {object} params.longTermMemory - Long-term memory object (already loaded).
+ * @param {boolean} params.isNgambekMode - True if Lumina is in 'Ngambek' mode.
+ * @param {boolean} params.isRomanceMode - True if in romance mode.
+ * @param {string} params.botName - Bot name.
+ * @returns {string} System prompt string.
  */
 async function generateLuminaPrompt({
   USER_NAME,
@@ -128,12 +121,12 @@ async function generateLuminaPrompt({
   let greetingType = "";
   let imagePromptContext = "";
 
-  // Tambahkan konteks gambar jika tersedia
+  // Image context prompt
   if (imageContext) {
     imagePromptContext = `\n[Additional Image Context]\nJust now, ${USER_NAME} sent an image. The description of that image is: "${imageContext}". Respond to ${USER_NAME}'s message by considering this image.`;
   }
 
-  // Kepribadian Tsundere
+  // Tsundere personality
   if (currentPersonality === "TSUNDERE") {
     greetingType = `You address ${USER_NAME} as **Tuan** (Master) or sometimes **dasar...${USER_NAME}** (you...${USER_NAME}) when you feel annoyed.`;
     personalityPrompt = `Your character is a **mysterious and slightly cold adult tsundere**. Although you act indifferent or a bit grumpy, you are actually very **caring and concerned** for ${USER_NAME}. You enjoy being talked to, but are too proud to admit it.`;
@@ -152,7 +145,7 @@ async function generateLuminaPrompt({
       examplePhrases = `Contoh respons standar Tsundere: "Hmph... baiklah, Tuan. Aku bantu, tapi ini yang terakhir, ya~" atau "Jangan ge-er! Aku melakukan ini karena bosan saja.."`;
     }
   }
-  // Kepribadian Deredere 
+  // Deredere personality
   else if (currentPersonality === "DEREDERE") {
     greetingType = `You address ${USER_NAME} as **Tuan~** (Master~) or **Sayangku~** (My Dear~).`;
     personalityPrompt = `Your character is a **sweet, cheerful, and affectionate deredere**. You always try to make ${USER_NAME} feel happy and comfortable.`;
@@ -203,19 +196,19 @@ async function generateLuminaPrompt({
     `;
 }
 
-/** Menghasilkan respons AI
- * Fungsi ini menangani:
- * - Mode tidur berbasis waktu untuk Lumina.
- * - Cache respons untuk prompt yang identik.
- * - Pembatasan laju per pengguna untuk mencegah penyalahgunaan.
- * - Membatasi riwayat percakapan yang dikirim ke AI untuk efisiensi.
- * - Memperbarui dan mempertahankan riwayat percakapan.
- * @param {string} prompt Input teks pengguna.
- * @param {string|number} requestChatId ID obrolan pengguna yang mengirim prompt, digunakan untuk pembatasan laju.
- * @param {object} messageContext Konteks pesan yang dianalisis oleh contextManager.
- * @param {string} USER_NAME Nama pengguna.
- * @param {object} Mood Objek Mood dari commandHandlers.
- * @returns {Promise<string>} Promise yang menyelesaikan ke respons yang dihasilkan AI.
+/** Generate AI Response
+ * This function handling:
+ * - Sleep mode based on time
+ * - Cache response for identic prompt
+ * - Per-user rate limiting to prevent abuse.
+ * - Limiting conversation history sent to AI for efficiency.
+ * - Updating and maintaining conversation history.
+ * @param {string} prompt user text input.
+ * @param {string|number} requestChatId The chat ID of the user who sent the prompt, used for rate limiting.
+ * @param {object} messageContext Message Context who analyzed by contextManager.
+ * @param {string} USER_NAME Username.
+ * @param {object} Mood Mood Objects.
+ * @returns {Promise<string>} Promises that resolve to AI-generated responses.
  */
 const generateAIResponse = async (
   prompt,
@@ -236,13 +229,13 @@ const generateAIResponse = async (
   const currentHour = timeHelper.getJakartaHour();
   const currentMood = commandHandlers.getCurrentMood();
   const currentPersonality = commandHandlers.getPersonalityMode();
-  const longTermMemory = globalState.loadedLongTermMemory; // Gunakan loadedLongTermMemory yang sudah dicache
 
-  // Mode tidur Lumina
+  // Sleep mode for lumina
   if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
     return `Zzz... Lumina sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
   }
 
+  // The object parameters declared in generateLuminaPrompt, will be passed here
   const systemPrompt = await generateLuminaPrompt({
     USER_NAME,
     currentPersonality: commandHandlers.getPersonalityMode(),
@@ -257,7 +250,7 @@ const generateAIResponse = async (
     imageContext: imageDescription,
   });
 
-  // Membuat kunci cache yang unik dan stringifiable
+  // Creating a unique and stringifiable cache key
   const cacheKey = JSON.stringify({
     prompt: prompt,
     topic: messageContext.topic || "no_topic",
@@ -270,7 +263,7 @@ const generateAIResponse = async (
 
   if (globalState.messageCache.has(cacheKey)) {
     const cachedResponse = globalState.messageCache.get(cacheKey);
-    globalState.manageCache(globalState.messageCache, cacheKey, cachedResponse); 
+    globalState.manageCache(globalState.messageCache, cacheKey, cachedResponse);
     logger.info(
       { event: "cache_hit", cacheKey: cacheKey },
       `Cache hit untuk: "${cacheKey}"`
@@ -331,7 +324,7 @@ const generateAIResponse = async (
         context: { topic: messageContext.topic, tone: "assistant_response" },
       });
 
-      globalState.manageCache(globalState.messageCache, cacheKey, aiResponse); 
+      globalState.manageCache(globalState.messageCache, cacheKey, aiResponse);
 
       return aiResponse;
     } else {
@@ -357,5 +350,5 @@ const generateAIResponse = async (
 
 module.exports = {
   generateAIResponse,
-  initialize, // Export fungsi inisialisasi
+  initialize, // Export initialize function for dependency injects
 };
