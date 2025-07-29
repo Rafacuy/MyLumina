@@ -40,7 +40,7 @@ const featureFlagsConfig = {
     ENABLE_SONGS_NOTIFIER: true,
 
     // Enables scheduled weather reminders.
-    ENABLE_WEATHER_REMINDER: false,
+    ENABLE_WEATHER_REMINDER: true,
 };
 
 /**

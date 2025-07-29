@@ -21,7 +21,7 @@
     "moment-timezone": "^0.6.0",
     "newsapi": "^2.4.1",
     "node-schedule": "^2.1.1",
-    "node-telegram-bot-api": "^0.63.0",
+    "node-telegram-bot-api": "^0.66.0",
     "openai": "^5.5.1",
     "pdf-parse": "^1.1.1",
     "pino": "^9.7.0",

@@ -2,7 +2,11 @@
 const schedule = require("node-schedule");
 const logger = require("../utils/logger");
 const memory = require("../data/memory");
-const { getWeatherData, getWeatherString, getWeatherReminder } = require("../modules/weather");
+const {
+  getWeatherData,
+  getWeatherString,
+  getWeatherReminder,
+} = require("../modules/weather");
 const Mood = require("../modules/mood");
 const { isFeatureEnabled } = require("../config/featureConfig");
 const { sendMessage } = require("../utils/sendMessage");
@@ -24,7 +28,6 @@ const globalState = require("../state/globalState"); // Import globalState
  * @param {function} updateTimeBasedModes - Function to update time-based modes.
  * @param {function} checkNgambekStatus - Function to check and update the 'sulk' status.
  * @param {string} USER_NAME - The user's name.
- * @param {object} configuredChatId - The ChatID to send notifications to.
  * @param {object} Sentry - The Sentry object for error tracking.
  */
 const setupCronJobs = (
@@ -32,15 +35,16 @@ const setupCronJobs = (
   updateTimeBasedModes,
   checkNgambekStatus,
   USER_NAME,
-  configuredChatId,
-  Sentry,
+  Sentry
 ) => {
+
+  const configuredChatId = config.TARGET_CHAT_ID;
   if (!configuredChatId) {
     logger.warn(
       "⚠️ TARGET_CHAT_ID not found in config.js. Scheduled messages will NOT be sent."
     );
     return;
-  }
+  } 
 
   logger.info(
     `📬 Scheduled messages will be sent to chat ID: ${configuredChatId}`
@@ -48,9 +52,9 @@ const setupCronJobs = (
 
   // Cron job for weather reports (every 5 hours)
   // FF-CHECK: This job is guarded by its feature flag.
-  if (isFeatureEnabled('ENABLE_WEATHER_REMINDER')) {
+  if (isFeatureEnabled("ENABLE_WEATHER_REMINDER")) {
     schedule.scheduleJob(
-      { rule: "0 */5 * * *", tz: "Asia/Jakarta" },
+      { rule: "33 14 * * *", tz: "Asia/Jakarta" },
       async () => {
         try {
           const weather = await getWeatherData();
@@ -142,10 +146,10 @@ const setupCronJobs = (
       Sentry.captureException(error);
     }
   });
-  
+
   // Sad song recommendation every night at 10 PM
   // FF-CHECK: This job is guarded by its feature flag.
-  if (isFeatureEnabled('ENABLE_SONGS_NOTIFIER')) {
+  if (isFeatureEnabled("ENABLE_SONGS_NOTIFIER")) {
     schedule.scheduleJob({ rule: "0 22 * * *", tz: "Asia/Jakarta" }, () => {
       try {
         sendSadSongNotification(configuredChatId);
@@ -174,7 +178,7 @@ const setupCronJobs = (
 
   // Daily news and summary every morning at 8 AM
   // FF-CHECK: This job is guarded by its feature flag.
-  if (isFeatureEnabled('ENABLE_DAILY_NEWS')) {
+  if (isFeatureEnabled("ENABLE_DAILY_NEWS")) {
     schedule.scheduleJob(
       { rule: "0 8 * * *", tz: "Asia/Jakarta" },
       async () => {
@@ -222,46 +226,46 @@ const setupCronJobs = (
   });
 
   // Chat summary update every hour
-  schedule.scheduleJob(
-    { rule: "0 * * * *", tz: "Asia/Jakarta" },
-    async () => {
-      logger.info(
-        { event: "update_chat_summary_start" },
-        "[Core] Updating chat summary..."
+  schedule.scheduleJob({ rule: "0 * * * *", tz: "Asia/Jakarta" }, async () => {
+    logger.info(
+      { event: "update_chat_summary_start" },
+      "[Core] Updating chat summary..."
+    );
+    try {
+      const fullHistory = await memory.load();
+      const summary = await chatSummarizer.getSummarizedHistory(
+        50,
+        fullHistory
       );
-      try {
-        const fullHistory = await memory.getInMemoryHistory();
-        const summary = await chatSummarizer.getSummarizedHistory(50, fullHistory);
-        if (summary) {
-          globalState.currentChatSummary = summary;
-          logger.info(
-            { event: "update_chat_summary_success" },
-            "[Core] New chat summary created successfully."
-          );
-        } else {
-          globalState.currentChatSummary = null;
-          logger.info(
-            { event: "update_chat_summary_no_summary" },
-            "[Core] No chat summary was generated or history is too short."
-          );
-        }
-      } catch (error) {
-        logger.error(
-          {
-            event: "update_chat_summary_error",
-            error: error.message,
-            stack: error.stack,
-          },
-          "Error while updating chat summary:"
+      if (summary) {
+        globalState.currentChatSummary = summary;
+        logger.info(
+          { event: "update_chat_summary_success" },
+          "[Core] New chat summary created successfully."
         );
-        Sentry.captureException(error);
+      } else {
+        globalState.currentChatSummary = null;
+        logger.info(
+          { event: "update_chat_summary_no_summary" },
+          "[Core] No chat summary was generated or history is too short."
+        );
       }
+    } catch (error) {
+      logger.error(
+        {
+          event: "update_chat_summary_error",
+          error: error.message,
+          stack: error.stack,
+        },
+        "Error while updating chat summary:"
+      );
+      Sentry.captureException(error);
     }
-  );
+  });
 
   // Scheduler for the Sulk System (every day at midnight)
   // FF-CHECK: This job is guarded by its feature flag.
-  if (isFeatureEnabled('ENABLE_SULK_MODE')) {
+  if (isFeatureEnabled("ENABLE_NGAMBEK_MODE")) {
     schedule.scheduleJob(
       { rule: "0 0 * * *", tz: "Asia/Jakarta" },
       async () => {
@@ -286,14 +290,14 @@ const setupCronJobs = (
     );
   } else {
     logger.info(
-        { event: "sulk_mode_disabled" },
-        "FF-CHECK: Sulk mode job is disabled by feature flag."
+      { event: "sulk_mode_disabled" },
+      "FF-CHECK: Sulk mode job is disabled by feature flag."
     );
   }
 
   // Check for holidays and send a notification if it's a holiday (every morning at 7 AM)
   // FF-CHECK: This job is guarded by its feature flag.
-  if (isFeatureEnabled('ENABLE_HOLIDAYS_REMINDER')) {
+  if (isFeatureEnabled("ENABLE_HOLIDAYS_REMINDER")) {
     if (config.calendarificApiKey) {
       schedule.scheduleJob(
         { rule: "0 7 * * *", tz: "Asia/Jakarta" },
