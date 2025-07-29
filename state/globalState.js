@@ -79,7 +79,7 @@ class GlobalState {
           `Memuat ${loadedHistory.length} pesan dari memori (via memory.js).`
         );
   
-        this.loadedLongTermMemory = await memory.getLongTermMemory();
+        this.loadedLongTermMemory = await memory.getLTMMemories();
         logger.info(
           {
             event: "long_term_memory_load",

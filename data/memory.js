@@ -1,60 +1,76 @@
 // data/memory.js
 // Handles persistence-data memory for the Lumina bot using LokiJS.
-// Versi ini dioptimalkan untuk performa dan efisiensi memori.
-// This module manages chat history, user preferences, and long-term memory (LTM),
-// including automatic data cleanup routines.
+// Optimized for performance, memory efficiency, and scalability.
 
 const path = require("path");
 const Loki = require("lokijs");
 
 // --- Configuration Constants ---
-
 const DB_PATH =
   process.env.NODE_ENV === "production"
     ? path.join(process.cwd(), "data", "Lumina_memory.json")
     : path.join(__dirname, "memory.json");
 
 const MAX_HISTORY_LENGTH = 100;
-// OPTIMASI: Ambang batas untuk flush, memberikan buffer sebelum melakukan trim.
 const FLUSH_THRESHOLD = MAX_HISTORY_LENGTH + 20;
-const CLEANUP_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 1 minggu
-const LTM_CLEANUP_INTERVAL = 6 * 60 * 60 * 1000; // 6 jam
-const LTM_CLEANUP_BATCH_SIZE = 50; // OPTIMASI: Ukuran batch untuk penghapusan LTM.
-const COMPACTION_INTERVAL = 12 * 60 * 60 * 1000; // 12 jam
-const QUERY_CACHE_TTL = 5000; // 5 detik TTL untuk cache query.
+const CLEANUP_INTERVAL = 7 * 24 * 60 * 60 * 1000; // 1 week
+const LTM_CLEANUP_INTERVAL = 6 * 60 * 60 * 1000; // 6 hours
+const LTM_CLEANUP_BATCH_SIZE = 50;
+const COMPACTION_INTERVAL = 12 * 60 * 60 * 1000; // 12 hours
+const QUERY_CACHE_TTL = 5000; // 5 seconds
+const MAX_CACHE_SIZE = 1000; // Cache size limit
 
-// --- Database Lazy Initialization ---
-
-// OPTIMASI: Objek database tidak diinisialisasi saat startup.
-// Ini akan diinisialisasi pada panggilan database pertama.
-let dbInstance = null;
-let initializationPromise = null;
-let queryCache = {
-  history: {
-    data: null,
-    timestamp: 0,
-  },
+// --- LTM Cleanup Configuration ---
+const LTM_CLEANUP_RULES = {
+  highPriority: { minPriority: 100, maxAgeDays: 60 },
+  mediumPriority: { minPriority: 91, maxPriority: 99, maxAgeDays: 14 },
+  lowPriority: { minPriority: 0, maxPriority: 90, maxAgeDays: 3 },
 };
 
-/**
- * OPTIMASI: Lazy Initialization
- * Menginisialisasi database hanya saat pertama kali dibutuhkan.
- * @returns {Promise<object>} Promise yang me-resolve dengan instance DB yang siap.
- */
+// --- Database and Cache Setup ---
+let dbInstance = null;
+let initializationPromise = null;
+let queryCache = new Map(); // Use Map for better performance
+
+// --- Cache Helper Functions ---
+const addToCache = (key, data) => {
+  if (queryCache.size >= MAX_CACHE_SIZE) {
+    const oldestKey = queryCache.keys().next().value;
+    queryCache.delete(oldestKey);
+  }
+  queryCache.set(key, { data, timestamp: Date.now() });
+};
+
+const getFromCache = (key) => {
+  const cached = queryCache.get(key);
+  if (cached && Date.now() - cached.timestamp < QUERY_CACHE_TTL) {
+    return cached.data;
+  }
+  queryCache.delete(key);
+  return null;
+};
+
+const invalidateCache = (prefix) => {
+  for (const key of queryCache.keys()) {
+    if (key.startsWith(prefix)) {
+      queryCache.delete(key);
+    }
+  }
+};
+
+// --- Database Lazy Initialization ---
 const getDbInstance = () => {
   if (!initializationPromise) {
     initializationPromise = new Promise((resolve, reject) => {
       console.log(`Initializing LokiJS database at ${DB_PATH}...`);
-      // OPTIMASI: Pengaturan autosave yang disesuaikan dan throttling dinonaktifkan.
       const db = new Loki(DB_PATH, {
         adapter: new Loki.LokiFsAdapter(),
         autoload: true,
         autoloadCallback: () => {
-          // OPTIMASI: Indeks biner adaptif diaktifkan untuk query timestamp yang lebih cepat.
           const history =
             db.getCollection("history") ||
             db.addCollection("history", {
-              indices: ["timestamp"],
+              indices: ["timestamp", "chatId"],
               adaptiveBinaryIndices: true,
             });
 
@@ -62,20 +78,18 @@ const getDbInstance = () => {
             db.getCollection("preferences") ||
             db.addCollection("preferences", { unique: ["key"] });
 
-          // OPTIMASI: Koleksi terpisah untuk LTM untuk menghindari pemindaian regex yang lambat.
           const ltm =
             db.getCollection("ltm") ||
             db.addCollection("ltm", {
-              indices: ["createdAt", "priority"],
+              indices: ["createdAt", "priority", "lastAccessed", "chatId", "type"],
             });
 
           dbInstance = { db, history, preferences, ltm };
           console.log("LokiJS database and collections are ready.");
           resolve(dbInstance);
         },
-        // OPTIMASI: Interval autosave yang lebih lama dan non-throttled.
         autosave: true,
-        autosaveInterval: 10000, // 10 detik
+        autosaveInterval: 10000,
         throttledSaves: false,
       });
     }).catch((err) => {
@@ -89,34 +103,22 @@ const getDbInstance = () => {
 // --- Core Memory Management Functions ---
 
 /**
- * OPTIMASI: Caching Hasil Query
- * Memuat riwayat percakapan terbaru, dengan caching untuk mengurangi query berulang.
+ * Load conversation history with caching and user-specific filter.
+ * @param {string} chatId - Optional, filter by chatId.
  * @returns {Promise<Array<Object>>}
  */
-const load = async () => {
+const load = async (chatId = null) => {
   const { history } = await getDbInstance();
-  const now = Date.now();
-
-  // Periksa cache terlebih dahulu
-  if (queryCache.history.data && now - queryCache.history.timestamp < QUERY_CACHE_TTL) {
-    return queryCache.history.data;
-  }
+  const cacheKey = chatId ? `history_${chatId}` : "history_all";
+  const cached = getFromCache(cacheKey);
+  if (cached) return cached;
 
   try {
-    const recentHistory = history
-      .chain()
-      .simplesort("timestamp", true)
-      .limit(MAX_HISTORY_LENGTH)
-      .data();
-
+    let query = history.chain().simplesort("timestamp", true);
+    if (chatId) query = query.find({ chatId });
+    const recentHistory = query.limit(MAX_HISTORY_LENGTH).data();
     const chronologicalHistory = recentHistory.reverse();
-    
-    // Simpan hasil ke cache
-    queryCache.history = {
-        data: chronologicalHistory,
-        timestamp: now
-    };
-
+    addToCache(cacheKey, chronologicalHistory);
     return chronologicalHistory;
   } catch (error) {
     console.error("Error loading history:", error);
@@ -125,8 +127,8 @@ const load = async () => {
 };
 
 /**
- * Menambahkan pesan baru ke riwayat.
- * @param {object} message - Objek pesan yang akan ditambahkan.
+ * Add a new message to history.
+ * @param {object} message - Message object to add.
  */
 const addMessage = async (message) => {
   const { history } = await getDbInstance();
@@ -144,48 +146,16 @@ const addMessage = async (message) => {
       context: message.context || {},
     };
     history.insert(messageToStore);
-    queryCache.history.data = null; // Invalidate cache
-    await flush(); // Flush dipanggil di sini, tetapi logika internalnya dioptimalkan.
+    invalidateCache("history");
   } catch (error) {
     console.error("Error adding message to history:", error);
   }
 };
 
 /**
- * OPTIMASI: Flushing Berbasis Ambang Batas
- * Memangkas koleksi riwayat hanya jika ukurannya jauh melebihi batas maksimum.
- * @returns {Promise<boolean>}
- */
-const flush = async () => {
-  const { history } = await getDbInstance();
-  try {
-    const currentHistoryCount = history.count();
-
-    if (currentHistoryCount > FLUSH_THRESHOLD) {
-      const excessCount = currentHistoryCount - MAX_HISTORY_LENGTH;
-      const oldMessages = history
-        .chain()
-        .simplesort("timestamp") // Urutkan menaik (yang tertua dulu)
-        .limit(excessCount)
-        .data();
-
-      if (oldMessages.length > 0) {
-        console.log(`Trimming ${oldMessages.length} old messages from history...`);
-        history.remove(oldMessages);
-        queryCache.history.data = null; // Invalidate cache
-      }
-    }
-    return true;
-  } catch (error) {
-    console.error("Error during memory flush (trimming):", error);
-    return false;
-  }
-};
-
-/**
- * Menyimpan atau memperbarui preferensi.
- * @param {string} key - Kunci unik untuk preferensi.
- * @param {any} value - Nilai yang akan disimpan.
+ * Save or update a preference with caching.
+ * @param {string} key - Unique preference key.
+ * @param {any} value - Value to store.
  */
 const savePreference = async (key, value) => {
   const { preferences } = await getDbInstance();
@@ -197,39 +167,56 @@ const savePreference = async (key, value) => {
     } else {
       preferences.insert({ key, value });
     }
+    invalidateCache(`pref_${key}`);
   } catch (error) {
     console.error(`Error saving preference for key "${key}":`, error);
   }
 };
 
 /**
- * Mengambil nilai preferensi berdasarkan kunci.
- * @param {string} key - Kunci preferensi yang akan diambil.
+ * Get preference value by key with caching.
+ * @param {string} key - Preference key.
  * @returns {Promise<any|undefined>}
  */
 const getPreference = async (key) => {
+  const cacheKey = `pref_${key}`;
+  const cached = getFromCache(cacheKey);
+  if (cached !== null) return cached;
+
   const { preferences } = await getDbInstance();
   try {
     const pref = preferences.findOne({ key });
-    return pref ? pref.value : undefined;
+    const value = pref ? pref.value : undefined;
+    addToCache(cacheKey, value);
+    return value;
   } catch (error) {
     console.error(`Error getting preference for key "${key}":`, error);
     return undefined;
   }
 };
 
-// --- LTM Specific Functions (Optimized) ---
+// --- LTM Specific Functions ---
 
 /**
- * OPTIMASI: Query LTM yang Efisien
- * Mengambil semua LTM dari koleksi khususnya.
+ * Get LTM memories with optional user filter and relevance sorting.
+ * @param {string} chatId - Optional, filter by chatId.
  * @returns {Promise<Array<Object>>}
  */
-const getLTMMemories = async () => {
+const getLTMMemories = async (chatId = null) => {
+  const cacheKey = chatId ? `ltm_${chatId}` : "ltm_all";
+  const cached = getFromCache(cacheKey);
+  if (cached) return cached;
+
   const { ltm } = await getDbInstance();
   try {
-    // Cukup query koleksi ltm, jauh lebih cepat daripada regex.
-    return ltm.chain().simplesort("priority", true).data();
+    let query = ltm.chain();
+    if (chatId) {
+        query = query.find({ 'chatId': chatId });
+    }
+    // Sort by priority (descending), then by creation date (descending)
+    const memories = query.simplesort("priority", true).simplesort("createdAt", true).data();
+    addToCache(cacheKey, memories);
+    return memories;
   } catch (error) {
     console.error("Error getting LTM memories:", error);
     return [];
@@ -237,57 +224,86 @@ const getLTMMemories = async () => {
 };
 
 /**
- * Menyimpan memori jangka panjang (LTM).
- * @param {string} key - Kunci unik untuk LTM.
- * @param {object} ltmData - Data LTM (termasuk konten, prioritas, dll.).
+ * Save LTM with validation and lastAccessed tracking.
+ * @param {string} key - Unique LTM key.
+ * @param {object} ltmData - LTM data (content, priority, etc.).
  */
 const saveLTMMemory = async (key, ltmData) => {
-    const { ltm } = await getDbInstance();
-    try {
-        const existingLtm = ltm.findOne({ key });
-        const dataToStore = { key, ...ltmData, createdAt: ltmData.createdAt || new Date().toISOString() };
-        if (existingLtm) {
-            Object.assign(existingLtm, dataToStore);
-            ltm.update(existingLtm);
-        } else {
-            ltm.insert(dataToStore);
-        }
-    } catch (error) {
-        console.error(`Error saving LTM for key "${key}":`, error);
+  const { ltm } = await getDbInstance();
+  if (!key || !ltmData || (typeof ltmData.content !== "string" && typeof ltmData.value !== "string") || !ltmData.priority) {
+    console.warn("Invalid LTM data:", { key, ltmData });
+    return;
+  }
+
+  try {
+    const existingLtm = ltm.findOne({ key });
+    const dataToStore = {
+      ...ltmData,
+      key,
+      priority: Math.max(0, Math.min(100, ltmData.priority)), // Validate priority
+      createdAt: ltmData.createdAt || new Date().toISOString(),
+      lastAccessed: new Date().toISOString(),
+    };
+    if (existingLtm) {
+      Object.assign(existingLtm, dataToStore);
+      ltm.update(existingLtm);
+    } else {
+      ltm.insert(dataToStore);
     }
+    invalidateCache("ltm");
+  } catch (error) {
+    console.error(`Error saving LTM for key "${key}":`, error);
+  }
 };
 
 /**
- * OPTIMASI: Pembersihan Batch
- * Membersihkan LTM lama secara bertahap untuk menghindari pemblokiran loop peristiwa.
+ * Batch cleanup of old LTMs with configurable rules.
  */
 const cleanupOldLTMs = async () => {
   console.log("Auto-cleanup LTM: Starting batch cleanup process...");
   const { ltm } = await getDbInstance();
+  const now = new Date();
+  let deletedCount = 0;
+
   try {
-    const now = new Date();
-    let deletedCount = 0;
-    
     const MS_PER_DAY = 1000 * 60 * 60 * 24;
     const criteria = {
-        $or: [
-            { priority: 100, createdAt: { $lt: new Date(now - 60 * MS_PER_DAY).toISOString() } }, // > 2 bulan
-            { priority: { $between: [91, 99] }, createdAt: { $lt: new Date(now - 14 * MS_PER_DAY).toISOString() } }, // > 2 minggu
-            { priority: { $lte: 90 }, createdAt: { $lt: new Date(now - 5 * MS_PER_DAY).toISOString() } } // > 5 hari
-        ]
+      $or: [
+        {
+          priority: LTM_CLEANUP_RULES.highPriority.minPriority,
+          createdAt: { $lt: new Date(now - LTM_CLEANUP_RULES.highPriority.maxAgeDays * MS_PER_DAY).toISOString() },
+        },
+        {
+          priority: {
+            $between: [
+              LTM_CLEANUP_RULES.mediumPriority.minPriority,
+              LTM_CLEANUP_RULES.mediumPriority.maxPriority,
+            ],
+          },
+          createdAt: { $lt: new Date(now - LTM_CLEANUP_RULES.mediumPriority.maxAgeDays * MS_PER_DAY).toISOString() },
+        },
+        {
+          priority: {
+            $between: [
+              LTM_CLEANUP_RULES.lowPriority.minPriority,
+              LTM_CLEANUP_RULES.lowPriority.maxPriority,
+            ],
+          },
+          createdAt: { $lt: new Date(now - LTM_CLEANUP_RULES.lowPriority.maxAgeDays * MS_PER_DAY).toISOString() },
+        },
+      ],
     };
 
     let hasMore = true;
     while (hasMore) {
-        const oldDocs = ltm.chain().find(criteria).limit(LTM_CLEANUP_BATCH_SIZE).data();
-
-        if (oldDocs.length > 0) {
-            ltm.remove(oldDocs);
-            deletedCount += oldDocs.length;
-            console.log(`Auto-cleanup LTM: Batch removed ${oldDocs.length} entries.`);
-        } else {
-            hasMore = false;
-        }
+      const oldDocs = ltm.chain().find(criteria).limit(LTM_CLEANUP_BATCH_SIZE).data();
+      if (oldDocs.length > 0) {
+        ltm.remove(oldDocs);
+        deletedCount += oldDocs.length;
+        console.log(`Auto-cleanup LTM: Batch removed ${oldDocs.length} entries.`);
+      } else {
+        hasMore = false;
+      }
     }
 
     if (deletedCount > 0) {
@@ -295,32 +311,29 @@ const cleanupOldLTMs = async () => {
     } else {
       console.log("Auto-cleanup LTM: No old LTM entries to clean up.");
     }
+    invalidateCache("ltm");
   } catch (error) {
     console.error("Auto-cleanup LTM error:", error);
   }
 };
 
-
-// --- Auto-maintenance Functions ---
-
 /**
- * OPTIMASI: Kompaksi Database Berkala
- * Secara berkala menyimpan database ke disk, yang juga melakukan kompaksi.
+ * Periodic database compaction.
  */
 const compactDatabase = async () => {
-    console.log("Performing periodic database compaction...");
-    const { db } = await getDbInstance();
-    db.saveDatabase((err) => {
-        if (err) {
-            console.error("Error during periodic compaction:", err);
-        } else {
-            console.log("Database compaction successful.");
-        }
-    });
+  console.log("Performing periodic database compaction...");
+  const { db } = await getDbInstance();
+  db.saveDatabase((err) => {
+    if (err) {
+      console.error("Error during periodic compaction:", err);
+    } else {
+      console.log("Database compaction successful.");
+    }
+  });
 };
 
 /**
- * Membersihkan pesan riwayat yang sangat lama.
+ * Clean up old history messages.
  */
 const cleanupOldMessages = async () => {
   const { history } = await getDbInstance();
@@ -330,39 +343,107 @@ const cleanupOldMessages = async () => {
     if (oldDocs.length > 0) {
       history.remove(oldDocs);
       console.log(`Auto-cleanup: Removed ${oldDocs.length} old messages from history.`);
+      invalidateCache("history");
     }
   } catch (error) {
     console.error("Auto-cleanup error (history):", error);
   }
 };
 
-// --- Scheduling and Startup ---
+// --- Flush as Scheduled Job ---
+const flushHistory = async () => {
+  const { history } = await getDbInstance();
+  try {
+    const currentHistoryCount = history.count();
+    if (currentHistoryCount > FLUSH_THRESHOLD) {
+      const excessCount = currentHistoryCount - MAX_HISTORY_LENGTH;
+      const oldMessages = history
+        .chain()
+        .simplesort("timestamp")
+        .limit(excessCount)
+        .data();
+      if (oldMessages.length > 0) {
+        console.log(`Trimming ${oldMessages.length} old messages from history...`);
+        history.remove(oldMessages);
+        invalidateCache("history");
+      }
+    }
+    return true;
+  } catch (error) {
+    console.error("Error during memory flush (trimming):", error);
+    return false;
+  }
+};
 
+// --- Scheduling and Startup ---
 (async () => {
-  await getDbInstance(); // Pastikan DB siap sebelum menjadwalkan tugas.
+  await getDbInstance();
   console.log("Scheduling maintenance jobs...");
   setInterval(cleanupOldMessages, CLEANUP_INTERVAL);
   setInterval(cleanupOldLTMs, LTM_CLEANUP_INTERVAL);
   setInterval(compactDatabase, COMPACTION_INTERVAL);
-
+  setInterval(flushHistory, 30 * 60 * 1000); // Flush every 30 mins
   console.log("Running initial cleanup on startup...");
   cleanupOldMessages();
   cleanupOldLTMs();
+  flushHistory();
 })();
 
 // --- Module Exports ---
-
 module.exports = {
   load,
   addMessage,
   getPreference,
   savePreference,
-  deletePreference: async (key) => { 
-      const { preferences } = await getDbInstance();
-      preferences.findAndRemove({ key });
+  deletePreference: async (key) => {
+    const { preferences } = await getDbInstance();
+    preferences.findAndRemove({ key });
+    invalidateCache(`pref_${key}`);
   },
   getLTMMemories,
   saveLTMMemory,
+  /**
+   * Deletes a single LTM entry by its unique key.
+   * @param {string} key - The unique key of the LTM entry to delete.
+   */
+  deleteLTMMemory: async (key) => {
+    const { ltm } = await getDbInstance();
+    try {
+      ltm.findAndRemove({ key: key });
+      invalidateCache("ltm");
+      console.log(`LTM entry with key "${key}" deleted.`);
+    } catch (error) {
+      console.error(`Error deleting LTM for key "${key}":`, error);
+    }
+  },
+  /**
+   * Retrieves all notes for a specific user.
+   * @param {string|number} userId - The user's ID.
+   * @returns {Promise<Array<Object>>} An array of note objects.
+   */
+  getNotesForUser: async (userId) => {
+    const { ltm } = await getDbInstance();
+    try {
+      return ltm.chain().find({ 'chatId': userId, 'type': 'note' }).simplesort('createdAt', true).data();
+    } catch (error) {
+      console.error(`Error getting notes for user ${userId}:`, error);
+      return [];
+    }
+  },
+  /**
+   * Retrieves all active (non-expired) reminders from memory.
+   * @returns {Promise<Array<Object>>} An array of reminder objects.
+   */
+  getAllActiveReminders: async () => {
+    const { ltm } = await getDbInstance();
+    try {
+      const now = new Date().toISOString();
+      return ltm.chain().find({ 'type': 'reminder', 'expiry': { '$gte': now } }).data();
+    } catch (error) {
+      console.error(`Error getting all active reminders:`, error);
+      return [];
+    }
+  },
   closeDb: async () => {
     if (!dbInstance) return;
     const { db } = await getDbInstance();

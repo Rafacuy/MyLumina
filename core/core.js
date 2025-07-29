@@ -657,7 +657,6 @@ module.exports = {
         bot,
         updateTimeBasedModes,
         checkNgambekStatus,
-        configuredChatId,
         Sentry
       );
     } else {
@@ -671,3 +670,4 @@ module.exports = {
     setupMessageListener(bot);
   },
 };
+ 

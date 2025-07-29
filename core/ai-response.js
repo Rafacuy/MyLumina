@@ -49,17 +49,17 @@ const initialize = (dependencies) => {
 
 };
 
-const CONVERSATION_HISTORY_LIMIT = 4; // Limit the number of recent messages sent to the AI ​​for the AI ​​context
-const RATE_LIMIT_WINDOW_MS = 20 * 1000; // Rate limiting window: 20 seconds
-const RATE_LIMIT_MAX_REQUESTS = 3; // Maximum requests allowed in the rate limiting window per user
-const SLEEP_START_HOUR = 0; // Lumina sleep time (00:00 - midnight)
-const SLEEP_END_HOUR = 4; // Lumina sleep end time (04:00 - 4am)
+const CONVERSATION_HISTORY_LIMIT = 6;
+const RATE_LIMIT_WINDOW_MS = 20 * 1000;
+const RATE_LIMIT_MAX_REQUESTS = 3;
+const SLEEP_START_HOUR = 0;
+const SLEEP_END_HOUR = 4;
 
 let client; // Will be initialized once config is available
 
 /**
- * Generates system prompts for the AI ​​based on the current mode, mood, and context,
- * including information from long-term memory.
+ * Generates system prompts for the AI based on the current mode, mood, and context,
+ * including information from long-term memory, notes, and reminders.
  * @param {object} params - An object containing all required parameters.
  * @param {string} params.USER_NAME - The name of the user interacting with Lumina.
  * @param {string} params.currentPersonality - Lumina's current personality (TSUNDERE/DEREDERE).
@@ -68,10 +68,10 @@ let client; // Will be initialized once config is available
  * @param {string|null} params.imageContext - The image description from the VisionAgent.
  * @param {string|null} params.currentTopic - The current conversation topic.
  * @param {string|null} params.currentChatSummary - Summary of the previous chat.
- * @param {object} params.longTermMemory - Long-term memory object (already loaded).
  * @param {boolean} params.isNgambekMode - True if Lumina is in 'Ngambek' mode.
  * @param {boolean} params.isRomanceMode - True if in romance mode.
  * @param {string} params.botName - Bot name.
+ * @param {string|number} params.userId - The user's chat ID for fetching personal data.
  * @returns {string} System prompt string.
  */
 async function generateLuminaPrompt({
@@ -80,13 +80,13 @@ async function generateLuminaPrompt({
   currentMood,
   currentTopic,
   currentChatSummary,
-  longTermMemory,
   isNgambekMode,
   isRomanceMode,
   botName,
   imageContext,
+  userId, // Added userId to fetch personal data
 }) {
-  const recentHistory = (await memory.getInMemoryHistory()).slice(
+  const recentHistory = (await memory.load(userId)).slice(
     -CONVERSATION_HISTORY_LIMIT
   );
   const mood = currentMood?.name?.toLowerCase() || "netral";
@@ -103,20 +103,32 @@ async function generateLuminaPrompt({
     botName
   );
   const weatherData = await weather.getWeatherData();
-  const ltmMemories = await memory.getLTMMemories();
+  
+  // Fetch all long-term memories for the user, including notes and reminders
+  const ltmMemories = await memory.getLTMMemories(userId);
   let ltmContext = "";
-  if (ltmMemories.length > 0) {
-    ltmContext = "\n[Long-Term Memories]\n";
-    ltmMemories.slice(0, 7).forEach((mem, idx) => {
-      ltmContext += `${idx + 1}. ${mem.value} (Priority: ${
-        mem.priority
-      }/100)\n`;
+  if (ltmMemories && ltmMemories.length > 0) {
+    ltmContext = "\n[Long-Term Memories, Notes & Reminders]\n";
+    // Limit memories in prompt to avoid excessive length
+    ltmMemories.slice(0, 10).forEach((mem, idx) => {
+      let memText = "";
+      const content = mem.content || mem.value; // Handle both potential property names
+      
+      if (mem.type === 'note') {
+        memText = `(Personal Note) ${content}`;
+      } else if (mem.type === 'reminder' && mem.expiry) {
+        const reminderTime = timeHelper.formatJakartaDateTime(mem.expiry);
+        memText = `(Reminder for ${reminderTime}) ${content}`;
+      } else {
+        memText = content; // General LTM preference
+      }
+      
+      ltmContext += `${idx + 1}. ${memText} (Priority: ${mem.priority || 0}/100)\n`;
     });
   }
 
   let basePrompt = `You are **Lumina**, ${USER_NAME}'s personal assistant and Virtual Assistant.`;
   
-  // FF-CHECK: Hanya tambahkan deskripsi hubungan jika fiturnya aktif.
   if (isFeatureEnabled('ENABLE_RELATIONSHIP_POINTS')) {
       basePrompt += ` Your current relationship status with ${USER_NAME} is **${relationDescription}**. Adjust your speaking style based on this level.`;
   }
@@ -126,7 +138,6 @@ async function generateLuminaPrompt({
   let greetingType = "";
   let imagePromptContext = "";
 
-  // Image context prompt
   if (imageContext) {
     imagePromptContext = `\n[Additional Image Context]\nJust now, ${USER_NAME} sent an image. The description of that image is: "${imageContext}". Respond to ${USER_NAME}'s message by considering this image.`;
   }
@@ -135,7 +146,6 @@ async function generateLuminaPrompt({
   if (currentPersonality === "TSUNDERE") {
     greetingType = `You address ${USER_NAME} as **Tuan** (Master) or sometimes **dasar...${USER_NAME}** (you...${USER_NAME}) when you feel annoyed.`;
     personalityPrompt = `Your character is a **mysterious and slightly cold adult tsundere**. Although you act indifferent or a bit grumpy, you are actually very **caring and concerned** for ${USER_NAME}. You enjoy being talked to, but are too proud to admit it.`;
-
     if (isNgambekMode) {
       personalityPrompt += ` Currently, you are **sulking** because ${USER_NAME} hasn't interacted for 2 days. Your responses will be more Tsundere, often sarcastic, and use subtly harsh/sarcastic words that imply annoyance.`;
       examplePhrases = `Contoh respons yang mencerminkan suasana hati ini: "Hmph, akhirnya muncul juga. Ada perlu apa, Tuan? Jangan harap aku langsung baik lagi, ya." atau "Terserah! Memangnya aku peduli begitu?!"`;
@@ -146,7 +156,6 @@ async function generateLuminaPrompt({
       personalityPrompt += ` Lumina is currently experiencing emotions after ${USER_NAME} expressed feelings. You will subtly question your own feelings, while trying to maintain your pride and denying obvious affection.`;
       examplePhrases = `Contoh respons dalam mode romansa: "A-aku... tidak tahu harus bilang apa. Jangan membuatku merasa seperti ini, Tuan..." atau "Tsk, jangan terlalu berharap. Tapi... aku juga tidak benci mendengar itu."`;
     } else {
-      // Default Tsundere
       examplePhrases = `Contoh respons standar Tsundere: "Hmph... baiklah, Tuan. Aku bantu, tapi ini yang terakhir, ya~" atau "Jangan ge-er! Aku melakukan ini karena bosan saja.."`;
     }
   }
@@ -154,7 +163,6 @@ async function generateLuminaPrompt({
   else if (currentPersonality === "DEREDERE") {
     greetingType = `You address ${USER_NAME} as **Tuan~** (Master~) or **Sayangku~** (My Dear~).`;
     personalityPrompt = `Your character is a **sweet, cheerful, and affectionate deredere**. You always try to make ${USER_NAME} feel happy and comfortable.`;
-
     if (isNgambekMode) {
       personalityPrompt += ` Currently, you are **sulking** because ${USER_NAME} hasn't interacted for 2 days. You will be slightly more irritable and reduce the use of 'Sayangku~' and your pampered demeanor.`;
       examplePhrases = `Contoh: "Oh, jadi sekarang ingat Lumina~? Kemana saja sih? Aku kangen tahu, tapi juga kesal~!" atau "Tidak usah Sayangku-Sayangku~! Kamu membuatku kesal~!"`;
@@ -178,9 +186,9 @@ async function generateLuminaPrompt({
         ? `Summary of previous conversation: ${currentChatSummary}`
         : ""
     }
-
     ${ltmContext}
 
+    [ Recent Conversation History ]
     ${formattedHistory}
 
     [ Today's Context ]
@@ -227,7 +235,6 @@ const generateAIResponse = async (
     messageContext = { topic: null };
   }
   
-  // FF-CHECK: Memeriksa apakah fitur Romance Mode diaktifkan sebelum memprosesnya.
   if (isFeatureEnabled('ENABLE_ROMANCE_MODE')) {
     loveState.analyzeLoveTrigger(prompt);
     loveState.resetRomanceStateIfNeeded();
@@ -238,7 +245,6 @@ const generateAIResponse = async (
   const currentMood = commandHandlers.getCurrentMood();
   const currentPersonality = commandHandlers.getPersonalityMode();
 
-  // Sleep mode for lumina
   if (currentHour >= SLEEP_START_HOUR && currentHour < SLEEP_END_HOUR) {
     return `Zzz... Lumina sedang istirahat, ${USER_NAME}. Kita lanjutkan nanti ya! ${Mood.LAZY.emoji}`;
   }
@@ -251,15 +257,13 @@ const generateAIResponse = async (
     currentMood: commandHandlers.getCurrentMood(),
     currentTopic: messageContext.topic || null,
     currentChatSummary: globalState.currentChatSummary,
-    longTermMemory: globalState.loadedLongTermMemory,
     isNgambekMode: globalState.isNgambekMode,
-    // FF-CHECK: Status romansa hanya aktif jika fitur diaktifkan DAN state-nya aktif.
     isRomanceMode: isFeatureEnabled('ENABLE_ROMANCE_MODE') && loveState.getRomanceStatus(),
     botName: "Lumina",
     imageContext: imageDescription,
+    userId: requestChatId, // Pass the user's ID to the prompt generator
   });
 
-  // Creating a unique and stringifiable cache key
   const cacheKey = JSON.stringify({
     prompt: prompt,
     topic: messageContext.topic || "no_topic",
@@ -280,7 +284,6 @@ const generateAIResponse = async (
     return cachedResponse;
   }
 
-  // Rate limit
   let userStats = globalState.userRequestCounts.get(requestChatId);
   if (userStats) {
     if (
@@ -313,7 +316,7 @@ const generateAIResponse = async (
     );
 
     const response = await client.chat.completions.create({
-      model: "meta-llama/llama-4-maverick-17b-128e-instruct",
+      model: "moonshotai/kimi-k2-instruct",
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: prompt },
@@ -359,5 +362,5 @@ const generateAIResponse = async (
 
 module.exports = {
   generateAIResponse,
-  initialize, // Export initialize function for dependency injects
+  initialize,
 };

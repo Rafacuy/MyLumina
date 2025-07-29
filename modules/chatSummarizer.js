@@ -73,7 +73,7 @@ const summarizeChatHistory = async (chatHistory, maxTokens = 150) => {
  */
 const getSummarizedHistory = async (historyLimit = 50) => {
     // Ambil riwayat obrolan dari memory.js
-    const fullHistory = await memory.getInMemoryHistory(); 
+    const fullHistory = await memory.load(); 
     // Ambil sebagian dari riwayat obrolan terbaru untuk diringkas
     const historyToSummarize = fullHistory.slice(-historyLimit);
 
