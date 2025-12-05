@@ -4,16 +4,16 @@
  
 const fs = require('fs').promises;
 const path = require('path');
-const axios = require('axios');
 const crypto = require('crypto');
 const Sentry = require('@sentry/node');
 
 const { sendMessage } = require('../utils/sendMessage');
+const telegramClient = require('../utils/telegramClient');
 const documentReader = require('../modules/documentReader');
 const logger = require('../utils/logger');
 
 // --- Constants ---
-const TEMP_DIR = path.join(__dirname, '..', 'temp');
+const TEMP_DIR = path.join(__dirname, '..', 'temp_images');
 const MAX_FILE_SIZE_TELEGRAM = 5 * 1024 * 1024; // 5 MB, initial limit before download.
 
 /**
@@ -27,18 +27,16 @@ async function ensureTempDir() {
     } catch (error) {
         logger.error({ event: 'temp_dir_creation_error', error: error.message }, 'Failed to create temp directory.');
         Sentry.captureException(error);
-        // Propagate the error to be caught by the main handler.
         throw new Error('Could not create temporary directory for file processing.');
     }
 }
 
 /**
  * Handles an incoming message containing a document.
- * @param {object} msg - The message object from node-telegram-bot-api.
- * @param {object} bot - The Telegram bot instance.
+ * @param {object} msg - The message object from Telegram (grammY context format).
  * @param {object} aiDependencies - An object containing AI dependencies from core.js, passed to the document reader.
  */
-async function handleDocument(msg, bot, aiDependencies) {
+async function handleDocument(msg, aiDependencies) {
     const chatId = msg.chat.id;
     const doc = msg.document;
 
@@ -51,8 +49,8 @@ async function handleDocument(msg, bot, aiDependencies) {
 
     // Initial validation of file size before attempting to download.
     // This prevents wasting bandwidth on files that are too large.
-    if (doc.file_size > MAX_FILE_SIZE_TELEGRAM) {
-        sendMessage(chatId, 'Buset, Ukuran file-nya terlalu besar, aku tidak bisa menganalisisnya. Maksimum 5MB ukuran dokumen.');
+    if (doc.file_size && doc.file_size > MAX_FILE_SIZE_TELEGRAM) {
+        await sendMessage(chatId, 'Buset, Ukuran file-nya terlalu besar, aku tidak bisa menganalisisnya. Maksimum 5MB ukuran dokumen.');
         logger.warn({ event: 'file_size_exceeded', size: doc.file_size }, 'File size validation failed before download.');
         return;
     }
@@ -64,26 +62,16 @@ async function handleDocument(msg, bot, aiDependencies) {
         await sendMessage(chatId, `Membaca file "${doc.file_name}"... Tunggu bentar yaa...`);
 
         // --- File Download ---
-        const fileLink = await bot.getFileLink(doc.file_id);
+        // Get file link from Telegram using grammY client
+        const fileInfo = await telegramClient.getFileLink(doc.file_id);
+        const downloadUrl = fileInfo.downloadUrl;
+
         // Generate a random file name to avoid naming conflicts.
         const randomFileName = `${crypto.randomBytes(16).toString('hex')}${path.extname(doc.file_name || '.tmp')}`;
         tempFilePath = path.join(TEMP_DIR, randomFileName);
 
-        // Logic: Use streams for downloading to handle files efficiently without loading them all into memory.
-        const response = await axios({
-            url: fileLink,
-            method: 'GET',
-            responseType: 'stream'
-        });
-
-        const writer = require('fs').createWriteStream(tempFilePath);
-        response.data.pipe(writer);
-
-        // Wait for the stream to finish writing the file to disk.
-        await new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject); // Handle potential writing errors.
-        });
+        // Download file using telegramClient method
+        await telegramClient.downloadFile(downloadUrl, tempFilePath);
 
         logger.info({ event: 'file_download_success', path: tempFilePath }, 'File downloaded successfully.');
 
@@ -108,9 +96,17 @@ async function handleDocument(msg, bot, aiDependencies) {
         }
 
         await sendMessage(chatId, userMessage);
+    } finally {
+        // Cleanup temporary file
+        if (tempFilePath) {
+            try {
+                await fs.unlink(tempFilePath);
+                logger.debug({ event: 'temp_file_deleted', path: tempFilePath }, 'Temporary file cleaned up.');
+            } catch (cleanupError) {
+                logger.warn({ event: 'temp_file_cleanup_error', path: tempFilePath, error: cleanupError.message }, 'Failed to cleanup temporary file.');
+            }
+        }
     }
-    // Note: The deletion of the temporary file is handled within the `documentReader` module,
-    // likely in a `finally` block to ensure cleanup even if an error occurs. This is good practice.
 }
 
 module.exports = { handleDocument };
