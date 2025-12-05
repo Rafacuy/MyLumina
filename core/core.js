@@ -32,6 +32,7 @@ const Mood = require("../modules/mood");
 
 // --- Utility Imports ---
 const { sendMessage } = require("../utils/sendMessage");
+const telegramClient = require("../utils/telegramClient");
 const timeHelper = require("../utils/timeHelper");
 const chatFormatter = require("../utils/chatFormatter");
 const { getUserName } = require("../utils/telegramHelper");
@@ -82,7 +83,7 @@ const END_NGAMBEK_INTERACTION_DAYS = 2;
  * This prevents race conditions when multiple messages arrive concurrently,
  * ensuring data integrity for timestamps and chat counts.
  */
-const updateInteractionStatus = async () => {
+const updateInteractionStatus = async (chatId = null) => {
   // Use the mutex to ensure this function runs exclusively.
   // No other call to this function can start until the current one finishes.
   await interactionMutex.runExclusive(async () => {
@@ -112,6 +113,7 @@ const updateInteractionStatus = async () => {
         {
           event: "interaction_status_updated",
           todayChatCount: globalState.dailyChatCounts[today],
+          chatId
         },
         `[Interaction] Interaction status updated. Today's chats: ${globalState.dailyChatCounts[today]}.`
       );
@@ -121,6 +123,7 @@ const updateInteractionStatus = async () => {
           event: "update_interaction_status_error",
           error: error.message,
           stack: error.stack,
+          chatId
         },
         "Error updating interaction status:"
       );
@@ -278,10 +281,12 @@ const analyzeAndSavePreferences = async (text) => {
 
 /**
  * Sets up the Telegram bot's message listener with optimized command handling.
- * @param {object} bot - The Telegram bot instance.
+ * @param {object} bot - The grammY Bot instance.
  */
 const setupMessageListener = (bot) => {
-  bot.on("message", async (msg) => {
+  // grammY uses .on() with context-based handlers
+  bot.on("message", async (ctx) => {
+    const msg = ctx.message;
     const {
       chat,
       text,
@@ -298,7 +303,7 @@ const setupMessageListener = (bot) => {
     // --- Location Message Handler ---
     if (location) {
       try {
-        await updateInteractionStatus();
+        await updateInteractionStatus(currentMessageChatId);
         const userId = senderInfo.id;
         const { latitude, longitude } = location;
 
@@ -364,13 +369,13 @@ const setupMessageListener = (bot) => {
     // --- Document Handler ---
     if (document && isFeatureEnabled("ENABLE_DOC_HANDLER")) {
       try {
-        await updateInteractionStatus();
+        await updateInteractionStatus(currentMessageChatId);
         const aiDependencies = {
           generateAIResponse,
           USER_NAME,
           Mood: commandHandlers.Mood,
         };
-        await docHandler.handleDocument(msg, bot, aiDependencies);
+        await docHandler.handleDocument(msg, aiDependencies);
       } catch (error) {
         logger.error(
           { event: "document_core_handler_error", error: error.message },
@@ -389,7 +394,10 @@ const setupMessageListener = (bot) => {
     if (photo && photo.length > 0 && isFeatureEnabled("ENABLE_AI_VISION")) {
       const fileId = photo[photo.length - 1].file_id;
       try {
-        const fileLink = await bot.getFileLink(fileId);
+        // Use telegramClient to get file link
+        const fileInfo = await telegramClient.getFileLink(fileId);
+        const fileLink = fileInfo.downloadUrl;
+
         logger.info(
           { event: "image_received", fileId },
           `Image received, initiating VisionAgent flow...`
@@ -465,7 +473,7 @@ const setupMessageListener = (bot) => {
       await relationState.addPointOnMessage();
     }
 
-    await updateInteractionStatus();
+    await updateInteractionStatus(currentMessageChatId);
     await analyzeAndSavePreferences(userPromptText);
 
     const messageContext = contextManager.analyzeMessage(msg);

@@ -1,6 +1,8 @@
 // config/config.js
 // This file mantains configurations of API Key, Tokens, etc
 
+const path = require('path');
+
 module.exports = {
     telegramBotToken: process.env.TELEGRAM_BOT_TOKEN, // Telegram bot token
     openRouterApiKey: process.env.OPENROUTER_API_KEY, // OpenRouterAPI
@@ -19,6 +21,7 @@ module.exports = {
     GOOGLE_SEARCH_API_KEY: process.env.GOOGLE_SEARCH_API_KEY, // Google search API key
     GOOGLE_SEARCH_CX: process.env.GOOGLE_SEARCH_CX, // Google search CX
     latitude: process.env.LATITUDE || '-7.412904', // Latitude (Default Jakarta)
-    longitude: process.env.LONGITUDE || '112.503495' // Longitude (Default Jakarta)
+    longitude: process.env.LONGITUDE || '112.503495', // Longitude (Default Jakarta)
+    selfieDirectory: process.env.SELFIE_DIRECTORY || path.join(__dirname, '..', 'assets', 'selfies')
 };
 

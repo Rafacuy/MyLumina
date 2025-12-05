@@ -41,6 +41,9 @@ const featureFlagsConfig = {
 
     // Enables scheduled weather reminders.
     ENABLE_WEATHER_REMINDER: true,
+
+    // Enables Lumina to respond with selfies from the configured directory.
+    ENABLE_SELFIE_RESPONSES: true,
 };
 
 /**

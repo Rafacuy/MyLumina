@@ -1,68 +1,81 @@
-// index.js 
-// Entry-point for this project.
+// index.js
+// Entry-point for MyLumina bot project.
+// Initializes grammY bot with long-polling and sets up graceful shutdown.
 
-require("dotenv").config(); // Dotenv import for config.js
-const TelegramBot = require("node-telegram-bot-api"); // Telegram Bot API Library 
-const express = require("express"); // Express.js import for keep-alive functions
-const memory = require("./data/memory"); // Contains persistent-data memory for Lumina
-const config = require("./config/config"); // Contains API Key, Token, etc secured with dotenv
-const { initLuminabot } = require("./core/core"); // Core module for LuminaBot
-const Sentry = require("@sentry/node"); // Sentry for error trace
-const logger = require("./utils/logger"); // Logger utility based on pino lubrary for structured logging
+require("dotenv").config();
+const express = require("express");
+const Sentry = require("@sentry/node");
 
-// Sentry Initialization
+const config = require("./config/config");
+const { initLuminabot } = require("./core/core");
+const memory = require("./data/memory");
+const logger = require("./utils/logger");
+const telegramClient = require("./utils/telegramClient");
+const { handlePollingError, setupGlobalErrorHandlers } = require("./utils/pollingErrorHandler");
+
+// === Sentry Initialization ===
 if (config.sentryDsn) {
   Sentry.init({
     dsn: config.sentryDsn,
     tracesSampleRate: 1.0,
   });
-  logger.info("[Sentry] Sentry is initialized.");
+  logger.info("[Sentry] Sentry error tracking initialized.");
 }
 
-// Express app initialization
+// === Setup global error handlers ===
+setupGlobalErrorHandlers();
+
+// === Express app initialization for keep-alive system ===
 const app = express();
 
-// Basic route for keep-alive system
 app.get("/", (req, res) => {
-  res.send("Bot is alive and polling!");
+  res.send("🌸 MyLumina bot is alive and running!");
 });
 
-const bot = new TelegramBot(config.telegramBotToken, { polling: true });
+// === Initialize Telegram Client and Bot ===
+let bot;
 
-// Notify the bot about polling errors to prevent it from crashing.
-bot.on("polling_error", (error) => {
+async function initializeBot() {
+  try {
+    // Initialize the Telegram client
+    await telegramClient.initialize();
+    bot = telegramClient.getBot();
+
+    // Initialize core bot logic
+    initLuminabot(bot);
+
+    logger.info("[Bot] MyLumina bot initialized successfully.");
+    return bot;
+  } catch (error) {
     logger.error(
       {
-        event: "polling_error",
-        code: error.code,
-        message: error.message,
+        event: "bot_initialization_error",
+        error: error.message,
+        stack: error.stack,
       },
-      "[Polling] Polling error:"
+      "[Bot] Failed to initialize bot"
     );
     Sentry.captureException(error);
-});
+    throw error;
+  }
+}
 
-// Initialize core logics for the bot
-initLuminabot(bot);
-
-
-// Start a Express server for keep-alive system endpoint
-app.listen(config.PORT, () => {
-  logger.info(`[Server] Keep-alive server running on port ${config.PORT}`);
-});
-
-// Handle application closing properly
+// === Graceful Shutdown Handler ===
 const gracefulShutdown = async (signal) => {
-  logger.info(`${signal} received. Shutting down gracefully...`);
+  logger.info(`[Shutdown] ${signal} received. Initiating graceful shutdown...`);
+
   try {
-    // Stops bot polling procedure
-    if (bot.isPolling()) {
-      await bot.stopPolling();
-      logger.info("[Bot] Polling stopped.");
+    // Stop the bot polling/webhooks
+    if (bot) {
+      await telegramClient.stop();
+      logger.info("[Bot] Bot stopped gracefully.");
     }
-    // Close connection database
+
+    // Close database connection
     await memory.closeDb();
     logger.info("[DB] Database connection closed.");
+
+    logger.info("[Shutdown] Graceful shutdown completed successfully.");
     process.exit(0);
   } catch (error) {
     logger.error(
@@ -71,13 +84,70 @@ const gracefulShutdown = async (signal) => {
         error: error.message,
         stack: error.stack,
       },
-      "Error during graceful shutdown:"
+      "[Shutdown] Error during graceful shutdown"
     );
     Sentry.captureException(error);
     process.exit(1);
   }
 };
 
+// === Register signal handlers ===
 process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+// === Error handler for bot long-polling ===
+telegramClient.getBot().catch((error) => {
+  handlePollingError(error);
+});
+
+// === Main startup function ===
+async function start() {
+  try {
+    // Initialize and start the bot
+    await initializeBot();
+
+    // Start long-polling
+    await bot.start({
+      // Optional: Configure polling parameters
+      allowed_updates: [
+        "message",
+        "callback_query",
+        "inline_query",
+        "chosen_inline_result",
+      ],
+      timeout: 30, // Long-polling timeout in seconds
+      drop_pending_updates: false, // Keep pending updates
+    });
+
+    logger.info("[Startup] Bot started successfully with long-polling.");
+  } catch (error) {
+    logger.error(
+      {
+        event: "startup_error",
+        error: error.message,
+        stack: error.stack,
+      },
+      "[Startup] Failed to start bot"
+    );
+    Sentry.captureException(error);
+    process.exit(1);
+  }
+}
+
+// === Start Express server for keep-alive ===
+app.listen(config.PORT, () => {
+  logger.info(
+    { port: config.PORT },
+    `[Server] Keep-alive server running on port ${config.PORT}`
+  );
+});
+
+// === Initialize bot and start polling ===
+start().catch((error) => {
+  logger.error(
+    { error: error.message },
+    "[Startup] Fatal error during startup"
+  );
+  process.exit(1);
+});
 

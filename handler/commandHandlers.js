@@ -3,9 +3,11 @@
  
 
 // --- Module Imports ---
-const { sendMessage } = require('../utils/sendMessage');
+const path = require('path');
+const { sendMessage, sendPhoto } = require('../utils/sendMessage');
 const commandHelper = require('../modules/commandLists');
 const config = require('../config/config');
+const { isFeatureEnabled } = require('../config/featureConfig');
 const Mood = require('../modules/mood');
 const { getWeatherData, getWeatherString, getWeatherReminder } = require('../modules/weather');
 const holidaysModule = require('./holidayHandlers');
@@ -13,6 +15,7 @@ const memory = require('../data/memory');
 const sendSadSongNotification = require('../utils/songNotifier');
 const logger = require('../utils/logger');
 const Sentry = require('@sentry/node');
+const selfieManager = require('../modules/selfieManager');
 
 // --- Lumina Configuration ---
 
@@ -44,7 +47,7 @@ let moodTimeoutId;
 
 /**
  * @type {object}
- * @description A reference to the Telegram bot instance, used for actions like 'typing'.
+ * @description A reference to the Telegram bot API client (bot.api), used for actions like 'typing'.
  */
 let botInstanceRef;
 
@@ -103,8 +106,8 @@ const getAISummarizer = () => globalAISummarizer;
  * @param {number} [duration=1500] - The duration in milliseconds to show the typing indicator.
  */
 const LuminaTyping = async (chatId, duration = 1500) => {
-    if (!botInstanceRef) {
-        logger.warn({ event: 'typing_action_failed', reason: 'bot_instance_not_set' }, "Bot instance is not initialized. Cannot send typing indicator.");
+    if (!botInstanceRef || typeof botInstanceRef.sendChatAction !== 'function') {
+        logger.warn({ event: 'typing_action_failed', reason: 'bot_instance_not_set_or_invalid' }, "Bot API instance is not initialized or missing sendChatAction. Cannot send typing indicator.");
         return;
     }
     try {
@@ -152,6 +155,27 @@ const getRandomMood = () => {
     const moods = Object.values(Mood).filter(mood => mood !== Mood.CALM);
     const randomIndex = Math.floor(Math.random() * moods.length);
     return moods[randomIndex];
+};
+
+// --- Selfie Helpers ---
+const tsundereSelfieCaptions = [
+    `Hmph... cuma sekali ini aku kasih lihat.`,
+    `Jangan salah paham! Aku cuma iseng aja.`,
+    `Kalau mau lihat lagi, rajin-rajin ngobrol dulu!`,
+    `Ini... tapi jangan simpan sembarangan ya. >///<`
+];
+
+const deredereSelfieCaptions = [
+    `Hehe, ini fotoku buat kamu~`,
+    `Aku senang kamu mau lihat aku!`,
+    `Nih, jangan kangen-kangen ya~`,
+    `Speciaaal buatmu, {user}! >///<`
+];
+
+const getSelfieCaption = (userName) => {
+    const pool = personalityMode === 'DEREDERE' ? deredereSelfieCaptions : tsundereSelfieCaptions;
+    const caption = pool[Math.floor(Math.random() * pool.length)];
+    return caption.replace('{user}', userName || USER_NAME);
 };
 
 // --- Command Handlers ---
@@ -253,6 +277,67 @@ Jangan ragu untuk mencoba perintah atau sekadar mengobrol dengan saya! ${Mood.HA
         })
     },
 
+    // --- Media & Selfie Requests ---
+    {
+        pattern: /(pap|minta foto|minta pap|lihat muka(mu)?|liat muka(mu)?|selfie|kirim foto(mu)?|lihat fotomu|liat fotomu)/i,
+        response: async (chatId, msg) => {
+            if (!isFeatureEnabled('ENABLE_SELFIE_RESPONSES')) {
+                return {
+                    text: `Fitur kirim foto lagi dimatikan ya.`,
+                    mood: Mood.NORMAL
+                };
+            }
+
+            const userName = msg.from.first_name || msg.from.username || USER_NAME;
+
+            try {
+                if (botInstanceRef && typeof botInstanceRef.sendChatAction === 'function') {
+                    await botInstanceRef.sendChatAction(chatId, 'upload_photo');
+                } else {
+                    await LuminaTyping(chatId, 1000);
+                }
+
+                const selfiePath = await selfieManager.getRandomSelfie();
+
+                if (!selfiePath) {
+                    const directory = selfieManager.getSelfieDirectory();
+                    return {
+                        text: `E-eh, aku belum punya foto yang siap dibagikan. Isi dulu folder selfies di ${directory} ya. ${Mood.SAD.emoji}`,
+                        mood: Mood.SAD
+                    };
+                }
+
+                const caption = getSelfieCaption(userName);
+                await sendPhoto(chatId, selfiePath, { caption });
+
+                await memory.addMessage({
+                    role: 'assistant',
+                    content: caption,
+                    timestamp: new Date().toISOString(),
+                    chatId,
+                    context: {
+                        topic: 'command_response',
+                        command: 'selfie_request',
+                        type: 'photo',
+                        file: path.basename(selfiePath)
+                    },
+                });
+
+                return {
+                    text: null,
+                    mood: currentMood
+                };
+            } catch (error) {
+                logger.error({ event: 'selfie_command_error', chatId, error: error.message, stack: error.stack }, 'Error handling selfie request');
+                Sentry.captureException(error);
+                return {
+                    text: `Maaf, fotonya belum bisa kukirim sekarang. ${Mood.SAD.emoji}`,
+                    mood: Mood.SAD
+                };
+            }
+        }
+    },
+
     // --- State & Info Commands ---
     {
         pattern: /^(mood|suasana hati)/i,
@@ -321,18 +406,22 @@ Jangan ragu untuk mencoba perintah atau sekadar mengobrol dengan saya! ${Mood.HA
                     const requestMessage = "Kirim lokasimu dulu ya~ 📍\n\nTenang saja, lokasi Anda hanya akan digunakan untuk memberikan informasi cuaca dan tidak akan kami salahgunakan.";
                     
                     // Mengirim pesan dengan tombol permintaan lokasi
-                    botInstanceRef.sendMessage(chatId, requestMessage, {
-                        reply_markup: {
-                            keyboard: [
-                                [{
-                                    text: "📍 Kirim Lokasi Saat Ini",
-                                    request_location: true
-                                }]
-                            ],
-                            resize_keyboard: true,
-                            one_time_keyboard: true
-                        }
-                    });
+                    if (botInstanceRef && typeof botInstanceRef.sendMessage === 'function') {
+                        botInstanceRef.sendMessage(chatId, requestMessage, {
+                            reply_markup: {
+                                keyboard: [
+                                    [{
+                                        text: "📍 Kirim Lokasi Saat Ini",
+                                        request_location: true
+                                    }]
+                                ],
+                                resize_keyboard: true,
+                                one_time_keyboard: true
+                            }
+                        });
+                    } else {
+                        sendMessage(chatId, requestMessage);
+                    }
                     
                     // Tidak mengembalikan teks karena pesan sudah dikirim langsung
                     return { text: null }; 
@@ -503,7 +592,10 @@ if (config.calendarificApiKey) {
  * @param {object} bot - The Telegram bot instance.
  */
 const setBotInstance = (bot) => {
-    botInstanceRef = bot;
+    botInstanceRef = bot?.api || bot;
+    if (!botInstanceRef || typeof botInstanceRef.sendChatAction !== 'function') {
+        logger.warn({ event: 'bot_instance_missing_sendChatAction' }, 'Bot instance set but sendChatAction is unavailable. Ensure bot.api is provided.');
+    }
 };
 
 /**
