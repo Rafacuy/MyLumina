@@ -1,37 +1,38 @@
 // utils/timeHelper.js
 
-const moment = require('moment-timezone'); // Library untuk penanganan waktu dan zona waktu
+const moment = require('moment-timezone'); // Library for handling time and timezones
 
 /**
- * Mengembalikan objek Moment.js yang diatur ke zona waktu Asia/Jakarta.
- * Ini adalah fungsi dasar untuk memastikan semua operasi waktu konsisten.
- * @returns {object} Objek Moment.js yang dikonfigurasi untuk Asia/Jakarta.
+ * Returns a Moment.js object set to Asia/Jakarta timezone.
+ * This is the base function to ensure all time operations are consistent.
+ * @returns {object} Moment.js object configured for Asia/Jakarta.
  */
 const getJakartaMoment = () => {
     return moment().tz('Asia/Jakarta');
 };
 
 /**
- * Mengembalikan jam saat ini di Jakarta dalam format 24 jam (HH).
- * @returns {number} Jam saat ini (0-23) di Jakarta.
+ * Returns the current hour in Jakarta in 24-hour format (HH).
+ * @returns {number} Current hour (0-23) in Jakarta.
  */
 const getJakartaHour = () => {
     return getJakartaMoment().hour();
 };
 
 /**
- * Mengembalikan menit saat ini di Jakarta dalam format (MM).
- * @returns {number} Menit saat ini (0-59) di Jakarta.
+ * Returns the current minute in Jakarta in (MM) format.
+ * @returns {number} Current minute (0-59) in Jakarta.
  */
 const getJakartaMinute = () => {
     return getJakartaMoment().minute();
 };
 
 /**
- * Mengembalikan tanggal dan waktu saat ini di Jakarta dalam format yang mudah dibaca.
- * Contoh: "Senin, 26 Mei 2025, 17:11"
- * @param {Date|string} [dateInput] Opsional: Tanggal atau string tanggal untuk diformat. Jika tidak disediakan, akan menggunakan waktu saat ini.
- * @returns {string} Tanggal dan waktu yang diformat.
+ * Returns the current date and time in Jakarta in a human-readable format.
+ * Example: "Senin, 26 Mei 2025, 17:11"
+ * @param {Date|string} [dateInput] Optional: Date or date string to format.
+ *   If not provided, will use the current time.
+ * @returns {string} Formatted date and time.
  */
 const formatJakartaDateTime = (dateInput) => {
     if (dateInput) {
@@ -41,9 +42,10 @@ const formatJakartaDateTime = (dateInput) => {
 };
 
 /**
- * Mengembalikan waktu di Jakarta dalam format HH:MM.
- * @param {Date|string} [dateInput] Opsional: Tanggal atau string tanggal untuk diformat. Jika tidak disediakan, akan menggunakan waktu saat ini.
- * @returns {string} Waktu yang diformat (HH:MM).
+ * Returns the time in Jakarta in HH:MM format.
+ * @param {Date|string} [dateInput] Optional: Date or date string to format.
+ *   If not provided, will use the current time.
+ * @returns {string} Formatted time (HH:MM).
  */
 const formatJakartaTime = (dateInput) => {
     if (dateInput) {
@@ -57,7 +59,5 @@ module.exports = {
     getJakartaHour,
     getJakartaMinute,
     formatJakartaDateTime,
-    formatJakartaTime
+    formatJakartaTime,
 };
-
-

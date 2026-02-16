@@ -1,90 +1,90 @@
 // handler/relationHandler.js
 // AUTHOR: Arash
-// DESCRIPTION: Mengelola status relasi, poin, dan level antara Chatbot dan User
+// DESCRIPTION: Manages relationship status, points, and levels between the Chatbot and User
 
 const fs = require('fs').promises;
 const path = require('path');
-const memory = require('../data/memory'); // Impor memory.js untuk mengakses riwayat chat
-const config = require('../config/config'); // Impor config.js untuk mendapatkan USER_NAME
-const { getJakartaMoment } = require('../utils/timeHelper') // Mengimpor fungsi, bukan variabel
+const memory = require('../data/memory'); // Import memory.js to access chat history
+const config = require('../config/config'); // Import config.js to get USER_NAME
+const { getJakartaMoment } = require('../utils/timeHelper');
 
-// --- Konfigurasi Status Relasi ---
-const RELATION_STATE_FILE = path.join(__dirname, '..', 'data', 'relationState.json'); // Lokasi file penyimpanan
-const WEEKLY_CONVERSATION_THRESHOLD = 30; // Target percakapan per minggu
-const WEEKLY_POINTS_BONUS = 30; // Poin bonus jika target tercapai
-const POINTS_PER_MESSAGE = 1; // Poin yang didapatkan setiap kali pengguna mengirim pesan
+// --- Relationship Status Configuration ---
+const RELATION_STATE_FILE = path.join(__dirname, '..', 'data', 'relationState.json'); // Storage file location
+const WEEKLY_CONVERSATION_THRESHOLD = 30; // Target conversations per week
+const WEEKLY_POINTS_BONUS = 30; // Bonus points if target is reached
+const POINTS_PER_MESSAGE = 1; // Points earned each time the user sends a message
 
-// Poin yang dibutuhkan untuk setiap level
+// Points required for each level
 const LEVEL_THRESHOLDS = {
     1: 0,
     2: 100,
     3: 250,
     4: 500,
-    5: 1000
+    5: 1000,
 };
 
-// Deskripsi untuk setiap level
+// Descriptions for each level
 const LEVEL_DESCRIPTIONS = {
-    1: "hanya asisten pembantu.",
-    2: "Teman dekat",
-    3: "Sahabat tersayang",
-    4: "Pacar",
-    5: "Pacar tersayang"
+    1: 'just a helping assistant.',
+    2: 'Close friend',
+    3: 'Dearest best friend',
+    4: 'Significant other',
+    5: 'Beloved partner',
 };
 
-// --- State Internal ---
+// --- Internal State ---
 let currentState = {
     points: 0,
     level: 1,
-    lastWeeklyCheckTimestamp: getJakartaMoment()
+    lastWeeklyCheckTimestamp: getJakartaMoment().valueOf(),
 };
 
 /**
- * Memuat status relasi dari file JSON.
- * Jika file tidak ada, file baru akan dibuat dengan nilai default.
+ * Loads relationship status from the JSON file.
+ * If the file doesn't exist, a new one will be created with default values.
  */
 async function loadRelationState() {
     try {
         const data = await fs.readFile(RELATION_STATE_FILE, 'utf8');
         currentState = JSON.parse(data);
-        // Pastikan lastWeeklyCheckTimestamp adalah numerik setelah dimuat
+        // Ensure lastWeeklyCheckTimestamp is numeric after loading
         if (typeof currentState.lastWeeklyCheckTimestamp !== 'number') {
-            currentState.lastWeeklyCheckTimestamp = getJakartaMoment();
+            currentState.lastWeeklyCheckTimestamp = getJakartaMoment().valueOf();
             await saveRelationState();
         }
-        console.log('✅ Status relasi berhasil dimuat.');
+        console.log('✅ Relationship status successfully loaded.');
     } catch (error) {
         if (error.code === 'ENOENT') {
-            console.log('File status relasi tidak ditemukan. Membuat file baru...');
-            currentState.lastWeeklyCheckTimestamp = getJakartaMoment(); // Inisialisasi juga saat file baru dibuat
+            console.log('Relationship status file not found. Creating a new one...');
+            currentState.lastWeeklyCheckTimestamp = getJakartaMoment().valueOf(); // Initialize when new file is created
             await saveRelationState();
         } else {
-            console.error('❌ Gagal memuat status relasi:', error);
+            console.error('❌ Failed to load relationship status:', error);
         }
     }
 }
 
 /**
- * Menyimpan status relasi saat ini ke file JSON.
+ * Saves the current relationship status to the JSON file.
  */
 async function saveRelationState() {
     try {
         await fs.writeFile(RELATION_STATE_FILE, JSON.stringify(currentState, null, 2));
-        console.log('💾 Status relasi berhasil disimpan.');
+        console.log('💾 Relationship status successfully saved.');
     } catch (error) {
-        console.error('❌ Gagal menyimpan status relasi:', error);
+        console.error('❌ Failed to save relationship status:', error);
     }
 }
 
 /**
- * Memperbarui level relasi berdasarkan poin saat ini.
- * @returns {boolean} - True jika level berubah, false jika tidak.
+ * Updates the relationship level based on current points.
+ * @returns {boolean} - True if the level changed, false otherwise.
  */
 function updateLevel() {
     const oldLevel = currentState.level;
     let newLevel = 1;
 
-    // Cek dari level tertinggi ke terendah
+    // Check from highest to lowest level
     for (let level = 5; level >= 1; level--) {
         if (currentState.points >= LEVEL_THRESHOLDS[level]) {
             newLevel = level;
@@ -94,119 +94,127 @@ function updateLevel() {
 
     if (newLevel !== oldLevel) {
         currentState.level = newLevel;
-        console.log(`🎉 LEVEL UP! Lumina sekarang berada di Level ${newLevel}: ${LEVEL_DESCRIPTIONS[newLevel]}`);
+        console.log(`🎉 LEVEL UP! Lumina is now at Level ${newLevel}: ${LEVEL_DESCRIPTIONS[newLevel]}`);
         return true;
     }
     return false;
 }
 
 /**
- * Menambah atau mengurangi poin dan memperbarui level.
- * @param {number} pointsToAdd - Jumlah poin yang akan ditambahkan (bisa negatif).
+ * Adds or subtracts points and updates the level.
+ * @param {number} pointsToAdd - Number of points to add (can be negative).
  */
 async function addPoints(pointsToAdd) {
-    console.log(`[DEBUG - RelationState] Fungsi addPoints dipanggil dengan ${pointsToAdd} poin.`);
+    console.log(`[DEBUG - RelationState] addPoints function called with ${pointsToAdd} points.`);
     currentState.points += pointsToAdd;
-    // Pastikan poin tidak negatif
+    // Ensure points are not negative
     if (currentState.points < 0) {
         currentState.points = 0;
     }
-    console.log(`✨ Poin relasi diubah sebesar ${pointsToAdd}. Total poin sekarang: ${currentState.points}`);
-    updateLevel(); // Panggil updateLevel setelah poin diubah
+    console.log(`✨ Relationship points changed by ${pointsToAdd}. Total points now: ${currentState.points}`);
+    updateLevel(); // Call updateLevel after points are changed
     await saveRelationState();
 }
 
 /**
- * Menambah poin setiap kali pengguna mengirim pesan.
- * Akan dipanggil dari core.js
+ * Adds points every time the user sends a message.
+ * Called from core.js
  */
 async function addPointOnMessage() {
     await addPoints(POINTS_PER_MESSAGE);
-    console.log(`[RelationState] Poin bertambah ${POINTS_PER_MESSAGE} dari interaksi pesan.`)
+    console.log(`[RelationState] Points increased by ${POINTS_PER_MESSAGE} from message interaction.`);
 }
 
-
 /**
- * Memeriksa jumlah percakapan dalam seminggu terakhir.
- * Jika lebih dari threshold, tambahkan poin bonus.
- * Fungsi ini harus dipanggil secara berkala (misalnya, setiap beberapa jam) dari core.js.
+ * Checks the number of conversations in the past week.
+ * If above the threshold, grant bonus points.
+ * This function should be called periodically (e.g., every few hours) from core.js.
  */
 async function checkWeeklyConversation() {
-    // Pastikan lastWeeklyCheckTimestamp adalah angka
+    // Ensure lastWeeklyCheckTimestamp is a number
     if (typeof currentState.lastWeeklyCheckTimestamp !== 'number') {
-        currentState.lastWeeklyCheckTimestamp = getJakartaMoment();
+        currentState.lastWeeklyCheckTimestamp = getJakartaMoment().valueOf();
         await saveRelationState();
     }
 
     const oneWeekInMs = 7 * 24 * 60 * 60 * 1000;
-    const now = getJakartaMoment(); // Panggil fungsi untuk mendapatkan timestamp saat ini
+    const now = getJakartaMoment().valueOf(); // Get current timestamp in Jakarta timezone
 
-    // Cek apakah sudah lebih dari seminggu sejak pengecekan terakhir
+    // Check if it's been more than a week since the last check
     if (now - currentState.lastWeeklyCheckTimestamp > oneWeekInMs) {
-        console.log('⏳ Melakukan pengecekan percakapan mingguan...');
-        const history = await memory.getInMemoryHistory(); 
+        console.log('⏳ Performing weekly conversation check...');
+        
+        // Load history from memory (assuming load() returns the relevant history)
+        const history = await memory.load();
         const lastWeekDate = new Date(currentState.lastWeeklyCheckTimestamp);
 
-        // Filter pesan dari user target dalam seminggu terakhir
-        const userMessagesLastWeek = history.filter(msg =>
-            msg.role === 'user' &&
-            msg.from && // Pastikan properti 'from' ada
-            msg.from.first_name === config.USER_NAME &&
-            new Date(msg.timestamp) > lastWeekDate
+        // Filter messages from the target user within the last week
+        const userMessagesLastWeek = history.filter(
+            (msg) =>
+                msg.role === 'user' &&
+                msg.timestamp &&
+                new Date(msg.timestamp) > lastWeekDate,
         );
 
-        console.log(`Total percakapan dari ${config.USER_NAME} dalam seminggu terakhir: ${userMessagesLastWeek.length}`);
+        console.log(
+            `Total conversations from user in the past week: ${userMessagesLastWeek.length}`,
+        );
 
         if (userMessagesLastWeek.length > WEEKLY_CONVERSATION_THRESHOLD) {
-            console.log(`🏆 Target percakapan mingguan terlampaui! Memberikan ${WEEKLY_POINTS_BONUS} poin.`);
+            console.log(`🏆 Weekly conversation target exceeded! Granting ${WEEKLY_POINTS_BONUS} points.`);
             await addPoints(WEEKLY_POINTS_BONUS);
         } else {
-            console.log(`Tidak mencapai target percakapan mingguan (${userMessagesLastWeek.length}/${WEEKLY_CONVERSATION_THRESHOLD}).`);
+            console.log(
+                `Weekly conversation target not reached (${userMessagesLastWeek.length}/${WEEKLY_CONVERSATION_THRESHOLD}).`,
+            );
         }
 
-        // Reset timestamp pengecekan ke waktu sekarang
+        // Reset check timestamp to current time
         currentState.lastWeeklyCheckTimestamp = now;
         await saveRelationState();
     } else {
-        console.log(`Pengecekan mingguan belum saatnya. Tersisa ${Math.floor((oneWeekInMs - (now - currentState.lastWeeklyCheckTimestamp)) / (1000 * 60 * 60 * 24))} hari.`);
+        const remainingDays = Math.floor((oneWeekInMs - (now - currentState.lastWeeklyCheckTimestamp)) / (1000 * 60 * 60 * 24));
+        console.log(
+            `Weekly check is not yet due. ${remainingDays} days remaining.`,
+        );
     }
 }
 
-// --- Fungsi yang Diekspor ---
+// --- Exported Functions ---
 
 /**
- * Mendapatkan level relasi saat ini.
- * @returns {number} - Level saat ini (1-5).
+ * Gets the current relationship level.
+ * @returns {number} - Current level (1-5).
  */
 function getRelationLevel() {
     return currentState.level;
 }
 
 /**
- * Mendapatkan deskripsi dari level relasi saat ini.
- * @returns {string} - Deskripsi level.
+ * Gets the description of the current relationship level.
+ * @returns {string} - Level description.
  */
 function getRelationLevelDescription() {
-    return LEVEL_DESCRIPTIONS[currentState.level] || "Status tidak diketahui.";
+    return LEVEL_DESCRIPTIONS[currentState.level] || 'Status unknown.';
 }
 
 /**
- * Mendapatkan poin relasi saat ini.
- * @returns {number} - Jumlah poin.
+ * Gets current relationship points.
+ * @returns {number} - Number of points.
  */
 function getCurrentPoints() {
     return currentState.points;
 }
 
-// Inisialisasi
+// Initialization
 loadRelationState();
 
 module.exports = {
     loadRelationState,
     addPoints,
-    addPointOnMessage, // Ekspor fungsi baru
+    addPointOnMessage,
     checkWeeklyConversation,
     getRelationLevel,
     getRelationLevelDescription,
-    getCurrentPoints
+    getCurrentPoints,
 };

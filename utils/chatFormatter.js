@@ -10,23 +10,23 @@
  */
 function formatChatHistoryForPrompt(chatHistory, userName, botName) {
     if (!chatHistory || chatHistory.length === 0) {
-      return "[💬 Percakapan Sebelumnya]\nTidak ada riwayat percakapan.";
+        return '[💬 Percakapan Sebelumnya]\nTidak ada riwayat percakapan.';
     }
-  
-    let formattedText = "[💬 Percakapan Sebelumnya]\n";
-  
-    chatHistory.forEach(message => {
-      const sender = message.role === "user" ? userName : botName;
-      const content = message.content || message.text; // Pastikan mengambil konten yang benar
-  
-      if (content) {
-        formattedText += `${sender}: ${content}\n`;
-      }
+
+    let formattedText = '[💬 Percakapan Sebelumnya]\n';
+
+    chatHistory.forEach((message) => {
+        const sender = message.role === 'user' ? userName : botName;
+        const content = message.content || message.text; // Pastikan mengambil konten yang benar
+
+        if (content) {
+            formattedText += `${sender}: ${content}\n`;
+        }
     });
-  
+
     return formattedText;
-  }
-  
-  module.exports = {
-    formatChatHistoryForPrompt
-  };
+}
+
+module.exports = {
+    formatChatHistoryForPrompt,
+};

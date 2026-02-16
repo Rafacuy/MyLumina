@@ -1,5 +1,24 @@
-// utils/sendMessage.js
-// High-level message sending interface using grammY framework
+/**
+ * sendMessage.js - Message Sending Utility
+ *
+ * This module provides high-level wrappers for sending messages through Telegram.
+ * It abstracts the Telegram API complexity and provides consistent error handling,
+ * logging, and message formatting across the application.
+ *
+ * Features:
+ * - Text message sending with error handling
+ * - Photo/image sending with captions
+ * - Automatic logging of send operations
+ * - Consistent error reporting to Sentry
+ * - Support for message options (parse mode, keyboards, etc.)
+ *
+ * All functions in this module use the telegramClient for actual API calls
+ * and include proper error handling with structured logging.
+ *
+ * @module utils/sendMessage
+ * @requires ./telegramClient
+ * @requires ./logger
+ */
 
 const telegramClient = require('./telegramClient');
 const logger = require('./logger');
@@ -11,20 +30,20 @@ const logger = require('./logger');
  * @param {object} options - Additional options (parse_mode, reply_markup, etc.)
  */
 async function sendMessage(chatId, text, options = {}) {
-  try {
-    const result = await telegramClient.sendMessage(chatId, text, options);
-    logger.debug(
-      { event: 'send_message', chatId, messageId: result.message_id },
-      '[SendMessage] Message sent successfully'
-    );
-    return result;
-  } catch (error) {
-    logger.error(
-      { event: 'send_message_error', chatId, error: error.message },
-      '[SendMessage] Error sending message'
-    );
-    throw error;
-  }
+    try {
+        const result = await telegramClient.sendMessage(chatId, text, options);
+        logger.debug(
+            { event: 'send_message', chatId, messageId: result.message_id },
+            '[SendMessage] Message sent successfully',
+        );
+        return result;
+    } catch (error) {
+        logger.error(
+            { event: 'send_message_error', chatId, error: error.message },
+            '[SendMessage] Error sending message',
+        );
+        throw error;
+    }
 }
 
 /**
@@ -36,32 +55,30 @@ async function sendMessage(chatId, text, options = {}) {
  * @param {object} options - Additional options
  */
 async function sendVoiceNote(chatId, audioUrl, caption = '', options = {}) {
-  try {
-    const voiceOptions = {
-      caption: caption || undefined,
-      ...options,
-    };
+    try {
+        const voiceOptions = {
+            caption: caption || undefined,
+            ...options,
+        };
 
-    // Remove undefined properties
-    Object.keys(voiceOptions).forEach(
-      key => voiceOptions[key] === undefined && delete voiceOptions[key]
-    );
+        // Remove undefined properties
+        Object.keys(voiceOptions).forEach((key) => voiceOptions[key] === undefined && delete voiceOptions[key]);
 
-    const result = await telegramClient.sendVoice(chatId, audioUrl, voiceOptions);
+        const result = await telegramClient.sendVoice(chatId, audioUrl, voiceOptions);
 
-    logger.info(
-      { event: 'voice_note_sent', chatId, messageId: result.message_id },
-      `[SendMessage] Voice note successfully sent to ${chatId}`
-    );
+        logger.info(
+            { event: 'voice_note_sent', chatId, messageId: result.message_id },
+            `[SendMessage] Voice note successfully sent to ${chatId}`,
+        );
 
-    return result;
-  } catch (error) {
-    logger.error(
-      { event: 'send_voice_note_error', chatId, error: error.message },
-      `[SendMessage] Failed to send voice note to ${chatId}: ${error.message}`
-    );
-    throw error;
-  }
+        return result;
+    } catch (error) {
+        logger.error(
+            { event: 'send_voice_note_error', chatId, error: error.message },
+            `[SendMessage] Failed to send voice note to ${chatId}: ${error.message}`,
+        );
+        throw error;
+    }
 }
 
 /**
@@ -71,20 +88,17 @@ async function sendVoiceNote(chatId, audioUrl, caption = '', options = {}) {
  * @param {object} options - Additional options (title, performer, duration, etc.)
  */
 async function sendAudio(chatId, audioUrl, options = {}) {
-  try {
-    const result = await telegramClient.sendAudio(chatId, audioUrl, options);
-    logger.debug(
-      { event: 'audio_sent', chatId, messageId: result.message_id },
-      '[SendMessage] Audio sent successfully'
-    );
-    return result;
-  } catch (error) {
-    logger.error(
-      { event: 'send_audio_error', chatId, error: error.message },
-      '[SendMessage] Error sending audio'
-    );
-    throw error;
-  }
+    try {
+        const result = await telegramClient.sendAudio(chatId, audioUrl, options);
+        logger.debug(
+            { event: 'audio_sent', chatId, messageId: result.message_id },
+            '[SendMessage] Audio sent successfully',
+        );
+        return result;
+    } catch (error) {
+        logger.error({ event: 'send_audio_error', chatId, error: error.message }, '[SendMessage] Error sending audio');
+        throw error;
+    }
 }
 
 /**
@@ -94,20 +108,20 @@ async function sendAudio(chatId, audioUrl, options = {}) {
  * @param {object} options - Additional options (caption, etc.)
  */
 async function sendDocument(chatId, document, options = {}) {
-  try {
-    const result = await telegramClient.sendDocument(chatId, document, options);
-    logger.debug(
-      { event: 'document_sent', chatId, messageId: result.message_id },
-      '[SendMessage] Document sent successfully'
-    );
-    return result;
-  } catch (error) {
-    logger.error(
-      { event: 'send_document_error', chatId, error: error.message },
-      '[SendMessage] Error sending document'
-    );
-    throw error;
-  }
+    try {
+        const result = await telegramClient.sendDocument(chatId, document, options);
+        logger.debug(
+            { event: 'document_sent', chatId, messageId: result.message_id },
+            '[SendMessage] Document sent successfully',
+        );
+        return result;
+    } catch (error) {
+        logger.error(
+            { event: 'send_document_error', chatId, error: error.message },
+            '[SendMessage] Error sending document',
+        );
+        throw error;
+    }
 }
 
 /**
@@ -117,20 +131,17 @@ async function sendDocument(chatId, document, options = {}) {
  * @param {object} options - Additional options (caption, etc.)
  */
 async function sendPhoto(chatId, photo, options = {}) {
-  try {
-    const result = await telegramClient.sendPhoto(chatId, photo, options);
-    logger.debug(
-      { event: 'photo_sent', chatId, messageId: result.message_id },
-      '[SendMessage] Photo sent successfully'
-    );
-    return result;
-  } catch (error) {
-    logger.error(
-      { event: 'send_photo_error', chatId, error: error.message },
-      '[SendMessage] Error sending photo'
-    );
-    throw error;
-  }
+    try {
+        const result = await telegramClient.sendPhoto(chatId, photo, options);
+        logger.debug(
+            { event: 'photo_sent', chatId, messageId: result.message_id },
+            '[SendMessage] Photo sent successfully',
+        );
+        return result;
+    } catch (error) {
+        logger.error({ event: 'send_photo_error', chatId, error: error.message }, '[SendMessage] Error sending photo');
+        throw error;
+    }
 }
 
 /**
@@ -138,18 +149,15 @@ async function sendPhoto(chatId, photo, options = {}) {
  * @param {number|string} chatId - Target chat ID
  */
 async function sendTypingIndicator(chatId) {
-  try {
-    await telegramClient.sendChatAction(chatId, 'typing');
-    logger.debug(
-      { event: 'typing_indicator_sent', chatId },
-      '[SendMessage] Typing indicator sent'
-    );
-  } catch (error) {
-    logger.warn(
-      { event: 'typing_indicator_error', chatId, error: error.message },
-      '[SendMessage] Error sending typing indicator'
-    );
-  }
+    try {
+        await telegramClient.sendChatAction(chatId, 'typing');
+        logger.debug({ event: 'typing_indicator_sent', chatId }, '[SendMessage] Typing indicator sent');
+    } catch (error) {
+        logger.warn(
+            { event: 'typing_indicator_error', chatId, error: error.message },
+            '[SendMessage] Error sending typing indicator',
+        );
+    }
 }
 
 /**
@@ -160,20 +168,17 @@ async function sendTypingIndicator(chatId) {
  * @param {object} options - Additional options
  */
 async function editMessage(chatId, messageId, text, options = {}) {
-  try {
-    const result = await telegramClient.editMessageText(chatId, messageId, text, options);
-    logger.debug(
-      { event: 'message_edited', chatId, messageId },
-      '[SendMessage] Message edited successfully'
-    );
-    return result;
-  } catch (error) {
-    logger.warn(
-      { event: 'edit_message_error', chatId, messageId, error: error.message },
-      '[SendMessage] Error editing message'
-    );
-    throw error;
-  }
+    try {
+        const result = await telegramClient.editMessageText(chatId, messageId, text, options);
+        logger.debug({ event: 'message_edited', chatId, messageId }, '[SendMessage] Message edited successfully');
+        return result;
+    } catch (error) {
+        logger.warn(
+            { event: 'edit_message_error', chatId, messageId, error: error.message },
+            '[SendMessage] Error editing message',
+        );
+        throw error;
+    }
 }
 
 /**
@@ -182,30 +187,27 @@ async function editMessage(chatId, messageId, text, options = {}) {
  * @param {number} messageId - Message ID to delete
  */
 async function deleteMessage(chatId, messageId) {
-  try {
-    await telegramClient.deleteMessage(chatId, messageId);
-    logger.debug(
-      { event: 'message_deleted', chatId, messageId },
-      '[SendMessage] Message deleted successfully'
-    );
-  } catch (error) {
-    logger.warn(
-      { event: 'delete_message_error', chatId, messageId, error: error.message },
-      '[SendMessage] Error deleting message'
-    );
-    throw error;
-  }
+    try {
+        await telegramClient.deleteMessage(chatId, messageId);
+        logger.debug({ event: 'message_deleted', chatId, messageId }, '[SendMessage] Message deleted successfully');
+    } catch (error) {
+        logger.warn(
+            { event: 'delete_message_error', chatId, messageId, error: error.message },
+            '[SendMessage] Error deleting message',
+        );
+        throw error;
+    }
 }
 
 module.exports = {
-  sendMessage,
-  sendVoiceNote,
-  sendAudio,
-  sendDocument,
-  sendPhoto,
-  sendTypingIndicator,
-  editMessage,
-  deleteMessage,
-  // Export client for advanced usage
-  telegramClient,
+    sendMessage,
+    sendVoiceNote,
+    sendAudio,
+    sendDocument,
+    sendPhoto,
+    sendTypingIndicator,
+    editMessage,
+    deleteMessage,
+    // Export client for advanced usage
+    telegramClient,
 };

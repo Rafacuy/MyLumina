@@ -1,7 +1,6 @@
 // handler/contextHandler.js
-// A simple context analysis module to determine the topic and tone of a user's message. 
+// A simple context analysis module to determine the topic and tone of a user's message.
 // This helps the bot to understand the intent behind the message and respond more appropriately.
-
 
 /**
  * @const {object} TOPIC_KEYWORDS
@@ -14,7 +13,17 @@ const TOPIC_KEYWORDS = {
     MOVIE: ['film', 'nonton', 'bioskop', 'sinema', 'series', 'drama'],
     MUSIC: ['musik', 'lagu', 'band', 'penyanyi', 'konser', 'spotify'],
     GAME: ['game', 'main', 'mabar', 'gim', 'esports'],
-    TRAVEL: ['liburan', 'jalan-jalan', 'wisata', 'destinasi', 'traveling', 'hotel', 'pantai', 'gunung', 'keliling dunia'],
+    TRAVEL: [
+        'liburan',
+        'jalan-jalan',
+        'wisata',
+        'destinasi',
+        'traveling',
+        'hotel',
+        'pantai',
+        'gunung',
+        'keliling dunia',
+    ],
     TECH: ['teknologi', 'gadget', 'komputer', 'internet', 'aplikasi', 'software', 'hardware', 'coding', 'ngoding'],
     NEWS: ['berita', 'informasi', 'terkini', 'update', 'koran', 'artikel'],
     GENERAL_CHAT: ['halo', 'hai', 'apa kabar', 'kamu lagi apa', 'cerita dong'], // Keywords for general conversation
@@ -32,18 +41,18 @@ function detectTopic(content) {
         return null;
     }
     const lowerContent = content.toLowerCase();
-    
+
     // Logic: Sequentially search for any keyword from each topic.
     // This is a simple and effective approach for clear-cut cases.
     // For more complex analysis, a scoring system could be implemented.
     for (const topic in TOPIC_KEYWORDS) {
-        if (TOPIC_KEYWORDS[topic].some(keyword => lowerContent.includes(keyword))) {
+        if (TOPIC_KEYWORDS[topic].some((keyword) => lowerContent.includes(keyword))) {
             return topic;
         }
     }
-    
+
     // Return null if no keywords match, indicating a general or unknown topic.
-    return null; 
+    return null;
 }
 
 /**
@@ -60,12 +69,12 @@ function detectTone(content) {
 
     // Logic: Use regex with word boundaries (\b) to avoid partial matches (e.g., 'goblok' in 'goblokan').
     if (/\b(wkwk|haha|xixi|lol|anjay|mantap|keren)\b/.test(lowerContent)) {
-        return "casual";
+        return 'casual';
     } else if (/\b(bangsat|kontol|anjing|asu|goblok|tolol)\b/.test(lowerContent)) {
-        return "rude";
+        return 'rude';
     }
-    
-    return "normal";
+
+    return 'normal';
 }
 
 /**
@@ -77,8 +86,8 @@ function detectTone(content) {
 function checkAutoReply(content) {
     // Example: A simple "ping-pong" auto-reply.
     // This is a good spot to handle very common, static queries without involving the AI model.
-    if (content && content.toLowerCase() === "ping") {
-        return "Pong!";
+    if (content && content.toLowerCase() === 'ping') {
+        return 'Pong!';
     }
     return null;
 }
@@ -103,12 +112,12 @@ function analyzeMessage(message) {
 
     const topic = detectTopic(content);
     const tone = detectTone(content);
-    const autoReply = checkAutoReply(content); 
+    const autoReply = checkAutoReply(content);
 
     return {
         topic,
         tone,
-        autoReply
+        autoReply,
     };
 }
 
@@ -117,5 +126,5 @@ module.exports = {
     detectTone,
     analyzeMessage,
     checkAutoReply, // Exported for potential standalone use.
-    TOPIC_KEYWORDS // Exported in case other modules need access to the keyword list.
+    TOPIC_KEYWORDS, // Exported in case other modules need access to the keyword list.
 };

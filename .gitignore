@@ -3,6 +3,7 @@ memory.json
 reminders.json
 notes.json
 relationState.json
-node_modules
-temp_images
-temp
+node_modules/
+temp_images/
+temp/
+logs/

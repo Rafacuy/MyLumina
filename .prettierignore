@@ -1,0 +1,10 @@
+node_modules/
+logs/
+*.log
+.env
+.env.example
+data/memory.json
+data/relationState.json
+temp_images/
+assets/
+package-lock.json

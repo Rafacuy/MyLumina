@@ -1,125 +1,136 @@
 // modules/newsManager.js
-const NewsAPI = require('newsapi'); // Import library NewsAPI
-const config = require('../config/config'); // Mengambil konfigurasi (untuk NewsAPI key)
-const { sendMessage } = require('../utils/sendMessage'); // Fungsi utilitas untuk mengirim pesan
-const Groq = require("groq-sdk"); // Import Groq SDK untuk AI summarizer
-const logger = require('../utils/logger'); // Mengimpor logger yang sudah dikonfigurasi
-const Sentry = require('@sentry/node'); // Mengimpor Sentry
+const NewsAPI = require('newsapi'); // Import NewsAPI library
+const config = require('../config/config'); // Load configuration (for NewsAPI key)
+const { sendMessage } = require('../utils/sendMessage'); // Utility function to send messages
+const Groq = require('groq-sdk'); // Import Groq SDK for AI summarizer
+const logger = require('../utils/logger'); // Import configured logger
+const Sentry = require('@sentry/node'); // Import Sentry
 
-// Inisialisasi NewsAPI 
+// Initialize NewsAPI
 const newsapi = new NewsAPI(config.newsApiKey);
 
-// Inisialisasi Groq client 
+// Initialize Groq client
 const groq = new Groq({ apiKey: config.groqApiKey });
 
 /**
- * Mengambil berita utama dari Indonesia.
- * @returns {Promise<Array<Object>>} Array berisi objek berita atau array kosong jika terjadi kesalahan.
+ * Fetches top news headlines from Indonesia.
+ * @returns {Promise<Array<Object>>} Array of news objects or an empty array if an error occurs.
  */
 async function getTopNewsIndonesia() {
     try {
-        logger.info("[NewsManager] Mengambil berita utama dari NewsAPI...");
+        logger.info('[NewsManager] Fetching top news from NewsAPI...');
         const response = await newsapi.v2.everything({
             q: 'indonesia',
             language: 'id',
             sortBy: 'publishedAt',
-            pageSize: 5
+            pageSize: 5,
         });
-        
 
         if (response.status === 'ok' && response.articles.length > 0) {
-            logger.info(`[NewsManager] Berhasil mengambil ${response.articles.length} berita.`);
+            logger.info(`[NewsManager] Successfully fetched ${response.articles.length} news articles.`);
             return response.articles;
         } else {
-            logger.info("[NewsManager] Tidak ada berita yang ditemukan atau status bukan 'ok'.");
+            logger.info("[NewsManager] No news articles found or status is not 'ok'.");
             return [];
         }
     } catch (error) {
-        logger.error({
-            event: "get_top_news_error",
-            error: error.message,
-            stack: error.stack,
-            source: "NewsAPI"
-        }, "[NewsManager] Kesalahan saat mengambil berita dari NewsAPI:");
-        Sentry.captureException(error); // Laporkan kesalahan ke Sentry
+        logger.error(
+            {
+                event: 'get_top_news_error',
+                error: error.message,
+                stack: error.stack,
+                source: 'NewsAPI',
+            },
+            '[NewsManager] Error fetching news from NewsAPI:',
+        );
+        Sentry.captureException(error); // Report error to Sentry
         return [];
     }
 }
 
 /**
- * Meringkas teks menggunakan AI (Groq).
- * @param {string} textToSummarize Teks yang akan diringkas.
- * @returns {Promise<string>} Ringkasan teks atau pesan kesalahan jika gagal.
+ * Summarizes text using AI (Groq).
+ * @param {string} textToSummarize The text to be summarized.
+ * @returns {Promise<string>} Text summary or an error message if it fails.
  */
 async function summarizeText(textToSummarize) {
     if (!textToSummarize) {
-        logger.warn("[NewsManager] Tidak ada teks untuk diringkas.");
-        return "Tidak ada teks untuk diringkas.";
+        logger.warn('[NewsManager] No text provided for summarization.');
+        return 'No text provided for summarization.';
     }
-    logger.info("[NewsManager] Meringkas teks menggunakan AI...");
+    logger.info('[NewsManager] Summarizing text using AI...');
     try {
         const response = await groq.chat.completions.create({
-            model: "llama-3.3-70b-versatile", 
+            model: 'llama-3.3-70b-versatile',
             messages: [
                 {
-                  role: "system",
-                  content: "Kamu adalah sistem AI yang sangat ringkas dan langsung pada intinya."
+                    role: 'system',
+                    content: 'You are a highly concise AI system that gets straight to the point.',
                 },
                 {
-                  role: "user",
-                  content: `Ringkas teks berikut ke dalam 4-6 kalimat padat dan informatif dalam Bahasa Indonesia. 
-              Jangan gunakan kalimat pembuka seperti 'Berikut adalah ringkasan...' atau 'Tentu, ini ringkasannya...'. 
-              Langsung mulai ringkasan dengan isi berita tanpa frasa pembuka. Ini teksnya: "${textToSummarize}"`
-                }
-            ],              
-            max_tokens: 200, 
-            temperature: 0.7 
+                    role: 'user',
+                    content: `Summarize the following text into 4-6 concise and informative sentences in Indonesian. 
+              Do not use introductory phrases like 'Here is the summary...' or 'Sure, here is the summary...'. 
+              Start the summary immediately with the news content without any introductory phrases. Here is the text: "${textToSummarize}"`,
+                },
+            ],
+            max_tokens: 200,
+            temperature: 0.7,
         });
 
         if (response?.choices?.[0]?.message?.content) {
-            logger.info("[NewsManager] Ringkasan AI berhasil dibuat.");
+            logger.info('[NewsManager] AI summary successfully generated.');
             return response.choices[0].message.content.trim();
         } else {
-            logger.error({
-                event: "summarize_text_empty_response",
-                response: response,
-                source: "Groq"
-            }, "[NewsManager] Respons AI kosong atau tidak valid.");
-            Sentry.captureMessage("[NewsManager] Respons AI kosong atau tidak valid saat meringkas teks."); // Laporkan ke Sentry
-            return "Maaf, Lumina tidak bisa meringkas berita ini.";
+            logger.error(
+                {
+                    event: 'summarize_text_empty_response',
+                    response: response,
+                    source: 'Groq',
+                },
+                '[NewsManager] AI response is empty or invalid.',
+            );
+            Sentry.captureMessage('[NewsManager] AI response empty or invalid during text summarization.'); // Report to Sentry
+            return 'Sorry, Lumina could not summarize this news.';
         }
     } catch (error) {
-        logger.error({
-            event: "summarize_text_error",
-            error: error.message,
-            stack: error.stack,
-            source: "Groq"
-        }, "[NewsManager] Kesalahan saat meringkas teks dengan AI:");
-        Sentry.captureException(error); // Laporkan kesalahan ke Sentry
-        return "Terjadi kesalahan saat meringkas berita.";
+        logger.error(
+            {
+                event: 'summarize_text_error',
+                error: error.message,
+                stack: error.stack,
+                source: 'Groq',
+            },
+            '[NewsManager] Error summarizing text with AI:',
+        );
+        Sentry.captureException(error); // Report error to Sentry
+        return 'An error occurred during news summarization.';
     }
 }
 
 /**
- * Mengambil berita harian, meringkasnya, dan mengirimkannya ke chat ID yang ditentukan.
- * @param {string|number} chatId ID obrolan tujuan untuk mengirim berita.
+ * Fetches daily news, summarizes them, and sends them to the specified chat ID.
+ * @param {string|number} chatId Target chat ID to send the news.
  */
 async function sendDailyNews(chatId) {
     if (!chatId) {
-        logger.warn("[NewsManager] Chat ID tidak ditentukan, tidak bisa mengirim berita harian.");
+        logger.warn('[NewsManager] Chat ID not specified, cannot send daily news.');
         return;
     }
 
-    logger.info(`[NewsManager] Mengirim berita harian ke Chat ID: ${chatId}`);
+    logger.info(`[NewsManager] Sending daily news to Chat ID: ${chatId}`);
     const articles = await getTopNewsIndonesia();
 
     if (articles.length === 0) {
-        sendMessage(chatId, "Maaf, Lumina tidak dapat menemukan berita terbaru hari ini. Mungkin ada masalah dengan NewsAPI atau tidak ada berita yang tersedia.");
-        logger.info("[NewsManager] Tidak ada berita untuk dikirim.");
+        sendMessage(
+            chatId,
+            'Sorry, Lumina could not find any latest news today. There might be an issue with NewsAPI or no news available.',
+        );
+        logger.info('[NewsManager] No news to send.');
         return;
     }
 
-    let newsSummary = `📰 Berita Utama Hari Ini (${new Date().toLocaleDateString('id-ID')}):\n\n`;
+    let newsSummary = `📰 Today's Top News (${new Date().toLocaleDateString('id-ID')}):\n\n`;
     let hasValidNews = false;
 
     for (const article of articles) {
@@ -127,34 +138,37 @@ async function sendDailyNews(chatId) {
             if (article.title && article.description) {
                 const summarizedDescription = await summarizeText(article.description);
                 newsSummary += `* **${article.title}**\n`;
-                newsSummary += `  Ringkasan: _${summarizedDescription}_\n`;
+                newsSummary += `  Summary: _${summarizedDescription}_\n`;
                 if (article.url) {
-                    newsSummary += `  Baca selengkapnya: ${article.url}\n\n`;
+                    newsSummary += `  Read more: ${article.url}\n\n`;
                 } else {
-                    newsSummary += `\n`;
+                    newsSummary += '\n';
                 }
                 hasValidNews = true;
             }
         } catch (articleError) {
-            logger.error({
-                event: "process_article_error",
-                articleTitle: article.title,
-                error: articleError.message,
-                stack: articleError.stack
-            }, "[NewsManager] Error processing individual article:");
-            Sentry.captureException(articleError); // Laporkan kesalahan artikel ke Sentry
+            logger.error(
+                {
+                    event: 'process_article_error',
+                    articleTitle: article.title,
+                    error: articleError.message,
+                    stack: articleError.stack,
+                },
+                '[NewsManager] Error processing individual article:',
+            );
+            Sentry.captureException(articleError); // Report article error to Sentry
         }
     }
 
     if (hasValidNews) {
         await sendMessage(chatId, newsSummary);
-        logger.info("[NewsManager] Berita harian berhasil dikirim.");
+        logger.info('[NewsManager] Daily news successfully sent.');
     } else {
-        await sendMessage(chatId, "Lumina tidak dapat menemukan berita valid untuk diringkas hari ini.");
-        logger.info("[NewsManager] Tidak ada berita valid yang bisa dikirim.");
+        await sendMessage(chatId, 'Lumina could not find any valid news to summarize today.');
+        logger.info('[NewsManager] No valid news available to send.');
     }
 }
 
 module.exports = {
-    sendDailyNews
+    sendDailyNews,
 };

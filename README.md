@@ -19,32 +19,38 @@ MyLumina is a Node.js-based Telegram bot that leverages AI, long-term memory (LT
 ## 🚀 Main Features
 
 ### AI & Intelligence
+
 - **Groq-Powered Chat**: Lightning-fast AI responses powered by LLaMA/deepseek models
 - **Web Search + AI Summary**: Summarizes Google search results using AI
 - **AI Vision**: Image recognition & OCR text extraction
 - **Document Reader**: Reads/summarizes TXT, PDF, DOCX, CSV, and Markdown files
 
 ### Daily Life Tools
+
 - **Real-Time Weather**: Live weather info + personalized weather reminders
 - **Prayer Times**: Auto-scheduled for Asia/Jakarta timezone
 - **Holiday Tracker**: Public holiday info & reminders
 - **News Digest**: Daily summarized news at 8 AM
 
 ### Interactive Experience
+
 - **Dynamic Mood System**: Moods change based on time & interactions (auto-reset)
 - **DeepTalk Mode**: Switches to deep conversations after 9 PM
 - **Relationship System**: Personality evolves with ongoing interactions
 - **Context Detection**: Automatically detects conversation topics
 
 ### Productivity
+
 - **Voice/Text Reminders**: Set reminders via voice or text
 - **Personal Notes**: Secure personal note storage
 - **Long-Term Memory**: Learns from chat history & preferences
 
 ### Personalized Touches
+
 - **Nightly Sad Songs**: Sends calming song recommendations at 10 PM
 
 ### System Optimization
+
 - **Auto Cache Cleanup**: Manages memory & storage efficiently
 - **Dotenv Security**: Encrypted API key management
 - **Structured Logging**: Uses Pino for structured system logs
@@ -53,6 +59,7 @@ MyLumina is a Node.js-based Telegram bot that leverages AI, long-term memory (LT
 ---
 
 ## ⚙️ Tech Stack
+
 - **Node.js 18+**
 - **Telegram Bot API (node-telegram-bot-api)**
 - **LokiJS** (embedded database)
@@ -63,6 +70,7 @@ MyLumina is a Node.js-based Telegram bot that leverages AI, long-term memory (LT
 ---
 
 ## 📂 Folder Structure
+
 ```bash
 core/         => Core logic & AI response
 modules/      => Weather, mood, TTS, and more
@@ -79,42 +87,42 @@ state/        => Global state management
 ## 🔧 Installation
 
 1. Clone the repo:
-   ```bash
-   git clone https://github.com/Rafacuy/MyLumina.git
-   cd MyLumina
-   ```
+    ```bash
+    git clone https://github.com/Rafacuy/MyLumina.git
+    cd MyLumina
+    ```
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
+    ```bash
+    npm install
+    ```
 3. Add a `.env` file (see `.env.example` for reference)
 4. Run the bot:
-   ```bash
-   node index.js
-   ```
+    ```bash
+    node index.js
+    ```
 
 ---
 
 ## ⚙️ Environment Configuration
 
-| Variable          | Description                                   |
-| ----------------- | --------------------------------------------- |
-| TELEGRAM_TOKEN    | Telegram Bot Token                            |
-| DSN_KEY           | Sentry DSN project key                        |
-| NODE_ENV          | production / development                      |
-| TARGET_CHAT_ID    | Default chat ID for cron & notifications      |
-| LATITUDE          | Latitude location for Weather API             |
-| LONGITUDE         | Longitude location for Weather API            |
-| GROQ_API_KEY      | Groq API key for AI                           |
-| NEWSAPI           | Daily news API                                |
-| OCR_API_KEY       | API key for OCR                               |
-| IMAGGA_API        | Imagga API key                                |
-| IMAGGA_SECRET     | Imagga API secret key                         |
-| WEATHER_API_KEY   | OpenWeather API key                           |
-| GOOGLE_SEARCH     | Google Search API key                         |
-| GOOGLE_CX_KEY     | Google Search CX key                          |
-| CALENDARIFIC_KEY  | Calendarific API key                          |
-| PORT              | 3000 / 8080 (depending on your setup)         |
+| Variable         | Description                              |
+| ---------------- | ---------------------------------------- |
+| TELEGRAM_TOKEN   | Telegram Bot Token                       |
+| DSN_KEY          | Sentry DSN project key                   |
+| NODE_ENV         | production / development                 |
+| TARGET_CHAT_ID   | Default chat ID for cron & notifications |
+| LATITUDE         | Latitude location for Weather API        |
+| LONGITUDE        | Longitude location for Weather API       |
+| GROQ_API_KEY     | Groq API key for AI                      |
+| NEWSAPI          | Daily news API                           |
+| OCR_API_KEY      | API key for OCR                          |
+| IMAGGA_API       | Imagga API key                           |
+| IMAGGA_SECRET    | Imagga API secret key                    |
+| WEATHER_API_KEY  | OpenWeather API key                      |
+| GOOGLE_SEARCH    | Google Search API key                    |
+| GOOGLE_CX_KEY    | Google Search CX key                     |
+| CALENDARIFIC_KEY | Calendarific API key                     |
+| PORT             | 3000 / 8080 (depending on your setup)    |
 
 _(See full details in `.env.example` file)_
 

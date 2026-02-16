@@ -2,83 +2,87 @@
 // AUTHOR: Arash
 // TIKTOK: @rafardhancuy
 // Github: https://github.com/Rafacuy
-// LANGUAGE: ID (Indonesia)
+// LANGUAGE: EN (English)
 // MIT License
 
 const Groq = require('groq-sdk'); // Import Groq SDK
-const config = require('../config/config'); // Memuat konfigurasi (termasuk API key Groq)
-const memory = require('../data/memory'); // Memuat modul memory untuk mengakses riwayat obrolan
+const config = require('../config/config'); // Load configuration (including Groq API key)
+const memory = require('../data/memory'); // Load memory module to access chat history
 
 const client = new Groq({ apiKey: config.groqApiKey });
 
 /**
- * Meringkas riwayat obrolan yang diberikan menggunakan Groq API.
- * Modul ini dirancang untuk mengurangi penggunaan token dengan meringkas riwayat percakapan yang panjang.
+ * Summarizes the given chat history using Groq API.
+ * This module is designed to reduce token usage by summarizing long conversation histories.
  *
- * @param {Array<object>} chatHistory Riwayat obrolan yang akan diringkas. Setiap objek harus memiliki properti 'role' dan 'content'.
- * @param {number} [maxTokens=150] Batas token maksimum untuk ringkasan yang dihasilkan.
- * @returns {Promise<string|null>} Promise yang menyelesaikan ke string ringkasan, atau null jika terjadi kesalahan.
+ * @param {Array<object>} chatHistory Chat history to be summarized. Each object must have 'role' and 'content' properties.
+ * @param {number} [maxTokens=150] Maximum token limit for the generated summary.
+ * @returns {Promise<string|null>} Promise that resolves to the summary string, or null if an error occurs.
  */
 const summarizeChatHistory = async (chatHistory, maxTokens = 150) => {
-    // Memastikan riwayat obrolan adalah array dan tidak kosong
+    // Ensure chat history is an array and not empty
     if (!Array.isArray(chatHistory) || chatHistory.length === 0) {
-        console.warn("[ChatSummarizer] Riwayat obrolan kosong atau tidak valid.");
+        console.warn('[ChatSummarizer] Chat history is empty or invalid.');
         return null;
     }
 
-    // Memfilter riwayat untuk hanya menyertakan role dan content yang relevan
-    const formattedHistory = chatHistory.map(msg => ({
+    // Filter history to only include relevant roles and content
+    const formattedHistory = chatHistory.map((msg) => ({
         role: msg.role,
-        content: msg.content || msg.text 
+        content: msg.content || msg.text,
     }));
 
-    const systemPrompt = `Kamu adalah asisten yang bertugas meringkas percakapan.
-    Ringkas percakapan berikut ini menjadi satu paragraf yang koheren dan ringkas, fokus pada poin-poin utama dan topik yang dibahas.
-    Tujuan ringkasan ini adalah untuk menghemat token dan menyediakan konteks singkat untuk percakapan di masa mendatang.
-    Jangan tambahkan salam atau penutup. Hanya ringkasan murni.`;
+    const systemPrompt = `You are an assistant task to summarize conversations.
+    Summarize the following conversation into one coherent and concise paragraph, focusing on the main points and topics discussed.
+    The goal of this summary is to save tokens and provide brief context for future conversations.
+    Do not add greetings or closings. Just the pure summary.`;
 
     try {
-        console.log("[ChatSummarizer] Mengirim riwayat obrolan untuk diringkas ke Groq API...");
+        console.log('[ChatSummarizer] Sending chat history to Groq API for summarization...');
 
         const response = await client.chat.completions.create({
-            model: "llama-3.1-8b-instant", 
+            model: 'llama-3.1-8b-instant',
             messages: [
                 { role: 'system', content: systemPrompt },
-                { role: 'user', content: JSON.stringify(formattedHistory) }
+                { role: 'user', content: JSON.stringify(formattedHistory) },
             ],
-            max_tokens: maxTokens, 
-            temperature: 0.3 
+            max_tokens: maxTokens,
+            temperature: 0.3,
         });
 
         if (response?.choices?.[0]?.message?.content) {
             const summary = response.choices[0].message.content.trim();
-            console.log("[ChatSummarizer] Ringkasan berhasil diterima.");
+            console.log('[ChatSummarizer] Summary successfully received.');
             return summary;
         } else {
-            console.error('[ChatSummarizer] Groq API Error atau respons kosong:', response.data);
+            console.error('[ChatSummarizer] Groq API Error or empty response:', response.data);
             return null;
         }
     } catch (error) {
-        console.error('[ChatSummarizer] Error saat memanggil Groq API untuk peringkasan:', error.response?.data || error.message || error);
+        console.error(
+            '[ChatSummarizer] Error calling Groq API for summarization:',
+            error.response?.data || error.message || error,
+        );
         return null;
     }
 };
 
 /**
- * Fungsi untuk memicu peringkasan riwayat obrolan dari memory.js.
- * Dapat dipanggil secara berkala atau ketika riwayat mencapai ukuran tertentu.
+ * Function to trigger chat history summarization from memory.js.
+ * Can be called periodically or when history reaches a certain size.
  *
- * @param {number} [historyLimit=50] Jumlah pesan terakhir dari riwayat yang akan diringkas.
- * @returns {Promise<string|null>} Promise yang menyelesaikan ke string ringkasan terbaru, atau null jika tidak ada ringkasan.
+ * @param {number} [historyLimit=50] Number of recent messages from history to summarize.
+ * @returns {Promise<string|null>} Promise that resolves to the latest summary string, or null if no summary.
  */
 const getSummarizedHistory = async (historyLimit = 50) => {
-    // Ambil riwayat obrolan dari memory.js
-    const fullHistory = await memory.load(); 
-    // Ambil sebagian dari riwayat obrolan terbaru untuk diringkas
+    // Get chat history from memory.js
+    const fullHistory = await memory.load();
+    // Take a portion of the latest chat history to summarize
     const historyToSummarize = fullHistory.slice(-historyLimit);
 
-    if (historyToSummarize.length < 3) { // Jangan meringkas jika riwayat terlalu pendek
-        console.log("[ChatSummarizer] Riwayat obrolan terlalu pendek untuk diringkas.");
+    if (historyToSummarize.length < 3) {
+        // Do not summarize if history is too short
+        console.log('[ChatSummarizer] Chat history is too short to summarize.');
         return null;
     }
 
@@ -88,5 +92,5 @@ const getSummarizedHistory = async (historyLimit = 50) => {
 
 module.exports = {
     summarizeChatHistory,
-    getSummarizedHistory
+    getSummarizedHistory,
 };

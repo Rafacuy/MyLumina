@@ -1,7 +1,7 @@
 // handler/docHandler.js
 // Handles incoming document messages from Telegram. It downloads the file,
 // processes it using a document reader module, and sends back a summary.
- 
+
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
@@ -44,19 +44,28 @@ async function handleDocument(msg, aiDependencies) {
     if (!doc) {
         return;
     }
-    
-    logger.info({ event: 'document_received', chatId, file_id: doc.file_id, file_name: doc.file_name }, 'Document message received.');
+
+    logger.info(
+        { event: 'document_received', chatId, file_id: doc.file_id, file_name: doc.file_name },
+        'Document message received.',
+    );
 
     // Initial validation of file size before attempting to download.
     // This prevents wasting bandwidth on files that are too large.
     if (doc.file_size && doc.file_size > MAX_FILE_SIZE_TELEGRAM) {
-        await sendMessage(chatId, 'Buset, Ukuran file-nya terlalu besar, aku tidak bisa menganalisisnya. Maksimum 5MB ukuran dokumen.');
-        logger.warn({ event: 'file_size_exceeded', size: doc.file_size }, 'File size validation failed before download.');
+        await sendMessage(
+            chatId,
+            'Buset, Ukuran file-nya terlalu besar, aku tidak bisa menganalisisnya. Maksimum 5MB ukuran dokumen.',
+        );
+        logger.warn(
+            { event: 'file_size_exceeded', size: doc.file_size },
+            'File size validation failed before download.',
+        );
         return;
     }
-    
+
     let tempFilePath = '';
-    
+
     try {
         await ensureTempDir();
         await sendMessage(chatId, `Membaca file "${doc.file_name}"... Tunggu bentar yaa...`);
@@ -82,11 +91,13 @@ async function handleDocument(msg, aiDependencies) {
 
         // Send the summary result back to the user.
         await sendMessage(chatId, summary);
-
     } catch (error) {
-        logger.error({ event: 'document_handling_error', error: error.message, stack: error.stack }, 'Failed to handle document.');
+        logger.error(
+            { event: 'document_handling_error', error: error.message, stack: error.stack },
+            'Failed to handle document.',
+        );
         Sentry.captureException(error);
-        
+
         // Provide a user-friendly error message based on the error type.
         let userMessage = 'Oops, Ada kesalahan saat menganalisis dokumen. Mohon coba lagi nanti.';
         if (error.message.includes('Unsupported file type')) {
@@ -103,7 +114,10 @@ async function handleDocument(msg, aiDependencies) {
                 await fs.unlink(tempFilePath);
                 logger.debug({ event: 'temp_file_deleted', path: tempFilePath }, 'Temporary file cleaned up.');
             } catch (cleanupError) {
-                logger.warn({ event: 'temp_file_cleanup_error', path: tempFilePath, error: cleanupError.message }, 'Failed to cleanup temporary file.');
+                logger.warn(
+                    { event: 'temp_file_cleanup_error', path: tempFilePath, error: cleanupError.message },
+                    'Failed to cleanup temporary file.',
+                );
             }
         }
     }

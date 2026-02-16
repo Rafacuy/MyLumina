@@ -7,7 +7,7 @@
 // Change the values below to enable (true) or disable (false) features.
 const featureFlagsConfig = {
     // Enables "Sulk Mode" if the bot hasn't been spoken to for a while.
-    ENABLE_NGAMBEK_MODE: true,
+    ENABLE_NGAMBEK_MODE: false,
 
     // Enables the AI's ability to analyze and describe images sent by the user.
     ENABLE_AI_VISION: true,

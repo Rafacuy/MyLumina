@@ -1,25 +1,24 @@
 // utils/telegramHelper.js
 
 /**
- * Mengambil nama pengguna dari objek pesan Telegraf.
- * Prioritasnya adalah first_name, lalu username, dan fallback ke "Tuan".
- * @param {object} msg - Objek pesan dari Telegraf.
- * @returns {string} Nama pengguna.
+ * Retrieves the username from the Telegram message object.
+ * Priority is first_name, then username, falling back to "Tuan".
+ * @param {object} msg - Telegram message object.
+ * @returns {string} Username.
  */
 function getUserName(msg) {
     if (msg && msg.from) {
-      if (msg.from.first_name) {
-        return msg.from.first_name;
-      }
-      if (msg.from.username) {
-        return msg.from.username;
-      }
+        if (msg.from.first_name) {
+            return msg.from.first_name;
+        }
+        if (msg.from.username) {
+            return msg.from.username;
+        }
     }
-    // Jika tidak ada keduanya, gunakan nama default
-    return "Tuan";
-  }
-  
-  module.exports = {
+    // If neither is available, use a default name
+    return 'Tuan';
+}
+
+module.exports = {
     getUserName,
-  };
-  
+};

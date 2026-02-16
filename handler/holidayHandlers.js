@@ -2,7 +2,6 @@
 // Modul untuk mengambil dan memberitahukan hari libur menggunakan Calendarific API
 
 const axios = require('axios').default;
-const config = require('../config/config'); 
 
 /**
  * Mengambil daftar hari libur dari Calendarific API.
@@ -19,7 +18,7 @@ async function getHolidays(apiKey, country, year, month, day) {
         return null;
     }
 
-    const apiUrl = `https://calendarific.com/api/v2/holidays`;
+    const apiUrl = 'https://calendarific.com/api/v2/holidays';
     try {
         const response = await axios.get(apiUrl, {
             params: {
@@ -27,8 +26,8 @@ async function getHolidays(apiKey, country, year, month, day) {
                 country: country,
                 year: year,
                 month: month,
-                day: day
-            }
+                day: day,
+            },
         });
 
         if (response.data && response.data.response && response.data.response.holidays) {
@@ -36,11 +35,17 @@ async function getHolidays(apiKey, country, year, month, day) {
         } else {
             // Ini bukan error, tapi mungkin tidak ada hari libur.
             // Calendarific mungkin mengembalikan array kosong di response.holidays jika tidak ada.
-            console.warn(`[Holidays] Tidak ada data hari libur yang ditemukan untuk ${day}-${month}-${year} di ${country}. Response:`, response.data);
+            console.warn(
+                `[Holidays] Tidak ada data hari libur yang ditemukan untuk ${day}-${month}-${year} di ${country}. Response:`,
+                response.data,
+            );
             return [];
         }
     } catch (error) {
-        console.error('[Holidays] Kesalahan saat mengambil data hari libur dari Calendarific:', error.response ? error.response.data : error.message);
+        console.error(
+            '[Holidays] Kesalahan saat mengambil data hari libur dari Calendarific:',
+            error.response ? error.response.data : error.message,
+        );
         return null;
     }
 }
@@ -51,7 +56,7 @@ async function getHolidays(apiKey, country, year, month, day) {
  * @returns {boolean} True jika hari libur dianggap penting, false jika tidak.
  */
 function isHolidayImportant(holiday) {
-    return holiday.type.some(type => type.toLowerCase().includes('national holiday'));
+    return holiday.type.some((type) => type.toLowerCase().includes('national holiday'));
 }
 
 /**
@@ -62,7 +67,7 @@ function isHolidayImportant(holiday) {
  * @param {function} notificationCallback - Fungsi callback untuk mengirim notifikasi. Menerima satu argumen: pesan (string).
  * @param {string} userName - Nama pengguna untuk personalisasi pesan.
  */
-async function checkAndNotifyDailyHolidays(apiKey, country, notificationCallback, userName = "Tuan") {
+async function checkAndNotifyDailyHolidays(apiKey, country, notificationCallback, userName = 'Tuan') {
     if (typeof notificationCallback !== 'function') {
         console.error('[Holidays] Kesalahan: notificationCallback harus berupa fungsi.');
         return;
@@ -77,10 +82,12 @@ async function checkAndNotifyDailyHolidays(apiKey, country, notificationCallback
     const holidays = await getHolidays(apiKey, country, year, month, day);
 
     if (holidays && holidays.length > 0) {
-        let importantEvents = [];
-        holidays.forEach(holiday => {
+        const importantEvents = [];
+        holidays.forEach((holiday) => {
             if (isHolidayImportant(holiday)) {
-                importantEvents.push(`*${holiday.name}*:\nDeskripsi: ${holiday.description || 'Tidak ada deskripsi.'}\nTipe: ${holiday.type.join(', ')}`);
+                importantEvents.push(
+                    `*${holiday.name}*:\nDeskripsi: ${holiday.description || 'Tidak ada deskripsi.'}\nTipe: ${holiday.type.join(', ')}`,
+                );
             }
         });
         if (importantEvents.length > 0) {
@@ -91,23 +98,25 @@ async function checkAndNotifyDailyHolidays(apiKey, country, notificationCallback
             // Opsional: kirim notifikasi bahwa tidak ada hari libur penting
             // notificationCallback(`Tidak ada hari libur penting yang tercatat untuk hari ini, ${userName}.`);
         }
-    } else if (holidays) { // holidays adalah array kosong
+    } else if (holidays) {
+        // holidays adalah array kosong
         console.log('[Holidays] Tidak ada hari libur yang terdaftar untuk hari ini (notifikasi).');
         // notificationCallback(`Tidak ada hari libur khusus yang tercatat untuk hari ini, ${userName}.`);
-    } else { // holidays adalah null
+    } else {
+        // holidays adalah null
         console.log('[Holidays] Gagal memeriksa hari libur (notifikasi) karena kesalahan pengambilan data.');
         // notificationCallback(`Maaf, ${userName}, Lyra tidak dapat memeriksa informasi hari libur saat ini.`);
     }
 }
 
 /**
- * Mengambil dan memformat informasi hari libur untuk hari ini menjadi sebuah string 
+ * Mengambil dan memformat informasi hari libur untuk hari ini menjadi sebuah string
  * @param {string} apiKey -  API Key Calendarific kamu
  * @param {string} country - Kode negara (misalnya, 'ID' untuk Indonesia).
  * @param {string} userName - Nama pengguna untuk personalisasi pesan.
  * @returns {Promise<string>} Sebuah promise yang resolve ke string pesan.
  */
-async function getFormattedTodaysHolidays(apiKey, country, userName = "Tuan") {
+async function getFormattedTodaysHolidays(apiKey, country, userName = 'Tuan') {
     const today = new Date();
     const year = today.getFullYear();
     const month = today.getMonth() + 1;
@@ -117,12 +126,16 @@ async function getFormattedTodaysHolidays(apiKey, country, userName = "Tuan") {
     const holidays = await getHolidays(apiKey, country, year, month, day);
 
     if (holidays && holidays.length > 0) {
-        let holidayMessages = [];
+        const holidayMessages = [];
         let importantCount = 0;
-        holidays.forEach(holiday => {
-            const importanceMarker = isHolidayImportant(holiday) ? "🌟 (Penting)" : "";
-            if (isHolidayImportant(holiday)) importantCount++;
-            holidayMessages.push(`*${holiday.name}* ${importanceMarker}\nDeskripsi: ${holiday.description || 'Tidak ada deskripsi.'}\nTipe: ${holiday.type.join(', ')}`);
+        holidays.forEach((holiday) => {
+            const importanceMarker = isHolidayImportant(holiday) ? '🌟 (Penting)' : '';
+            if (isHolidayImportant(holiday)) {
+                importantCount++;
+            }
+            holidayMessages.push(
+                `*${holiday.name}* ${importanceMarker}\nDeskripsi: ${holiday.description || 'Tidak ada deskripsi.'}\nTipe: ${holiday.type.join(', ')}`,
+            );
         });
 
         let responseMessage = `📝 Info Hari Ini (${day}-${month}-${year}) untuk ${userName}:\n\n`;
@@ -130,13 +143,14 @@ async function getFormattedTodaysHolidays(apiKey, country, userName = "Tuan") {
         if (importantCount > 0) {
             responseMessage += `\n\nAda ${importantCount} acara penting hari ini.`;
         } else {
-            responseMessage += `\n\nTidak ada acara yang ditandai sebagai "Penting Nasional" hari ini.`;
+            responseMessage += '\n\nTidak ada acara yang ditandai sebagai "Penting Nasional" hari ini.';
         }
         return responseMessage;
-
-    } else if (holidays) { // holidays adalah array kosong
+    } else if (holidays) {
+        // holidays adalah array kosong
         return `Tidak ada hari libur atau acara khusus yang tercatat untuk hari ini (${day}-${month}-${year}), ${userName}.`;
-    } else { // holidays adalah null
+    } else {
+        // holidays adalah null
         return `Maaf, ${userName}, Lyra tidak dapat memeriksa informasi hari libur saat ini karena ada masalah pengambilan data.`;
     }
 }
@@ -145,5 +159,5 @@ module.exports = {
     getHolidays,
     isHolidayImportant,
     checkAndNotifyDailyHolidays,
-    getFormattedTodaysHolidays 
+    getFormattedTodaysHolidays,
 };

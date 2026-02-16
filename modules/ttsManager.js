@@ -1,10 +1,9 @@
 // modules/ttsManager.js
-// Local version 
+// Local version
 
 const schedule = require('node-schedule');
 const path = require('path');
 const fs = require('fs');
-const sendMessage = require('../utils/sendMessage');
 const config = require('../config/config');
 
 // Map nama file voice note ke nama file di folder lokal
@@ -17,7 +16,7 @@ const VOICE_NOTE_FILES = {
     shalatDzuhur: 'dzuhur.ogg',
     shalatAshar: 'ashar.ogg',
     shalatMaghrib: 'maghrib.ogg',
-    shalatIsya: 'isya.ogg'
+    shalatIsya: 'isya.ogg',
 };
 
 const PrayerTimes = {
@@ -25,7 +24,7 @@ const PrayerTimes = {
     Dzuhur: { hour: 11, minute: 45, emoji: '☀️', file: 'shalatDzuhur' },
     Ashar: { hour: 14, minute: 45, emoji: '⛅', file: 'shalatAshar' },
     Maghrib: { hour: 17, minute: 30, emoji: '🌇', file: 'shalatMaghrib' },
-    Isya: { hour: 19, minute: 0, emoji: '🌌', file: 'shalatIsya' }
+    Isya: { hour: 19, minute: 0, emoji: '🌌', file: 'shalatIsya' },
 };
 
 const getVoiceStream = (filename) => {
@@ -39,13 +38,14 @@ const getVoiceStream = (filename) => {
 
 const sendVoiceFromLocal = (bot, chatId, filename, caption) => {
     const stream = getVoiceStream(filename);
-    if (!stream) return;
+    if (!stream) {
+        return;
+    }
 
-    bot.sendVoice(chatId, stream, { caption: caption || '' })
+    bot.api.sendVoice(chatId, stream, { caption: caption || '' })
         .then(() => console.log(`[TTS Manager] Voice note '${filename}' berhasil dikirim.`))
-        .catch(err => console.error(`[TTS Manager] Gagal mengirim voice note '${filename}':`, err.message));
+        .catch((err) => console.error(`[TTS Manager] Gagal mengirim voice note '${filename}':`, err.message));
 };
-
 
 const initTtsSchedules = (bot) => {
     const chatId = config.TARGET_CHAT_ID || config.chatId;
@@ -56,7 +56,12 @@ const initTtsSchedules = (bot) => {
 
     // Voice Note Selamat Pagi - 07:00 WIB
     schedule.scheduleJob({ rule: '0 7 * * *', tz: 'Asia/Jakarta' }, () => {
-        sendVoiceFromLocal(bot, chatId, VOICE_NOTE_FILES.selamatPagi, 'Selamat pagi, Tuan~ ayo cepat bangun! hehe, tuanku sangat lucu saat tidur~');
+        sendVoiceFromLocal(
+            bot,
+            chatId,
+            VOICE_NOTE_FILES.selamatPagi,
+            'Selamat pagi, Tuan~ ayo cepat bangun! hehe, tuanku sangat lucu saat tidur~',
+        );
     });
 
     // Voice Note Selamat Siang - 13:00 WIB
@@ -81,5 +86,5 @@ const initTtsSchedules = (bot) => {
 };
 
 module.exports = {
-    initTtsSchedules
+    initTtsSchedules,
 };
